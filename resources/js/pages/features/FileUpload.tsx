@@ -7,6 +7,9 @@ import axios from 'axios';
 import { Loader2, Upload } from 'lucide-react';
 import { ChangeEvent, FormEvent, useState } from 'react';
 
+import { CheckmarkSquare01Icon } from '@hugeicons/core-free-icons';
+import { HugeiconsIcon } from '@hugeicons/react';
+
 interface FileUploadData {
     id: number;
     filename: string;
@@ -116,7 +119,7 @@ export default function FileUploadIndex({ uploads }: Props) {
                     </p>
                 </div>
 
-                <Card>
+                <Card className="rounded-2xl shadow-none">
                     <CardHeader>
                         <CardTitle>Upload File</CardTitle>
                     </CardHeader>
@@ -170,33 +173,36 @@ export default function FileUploadIndex({ uploads }: Props) {
 
                 {/* History */}
                 {uploads.length > 0 && (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Riwayat Upload</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="space-y-2">
-                                {uploads.map((upload) => (
-                                    <div
-                                        key={upload.id}
-                                        className="flex justify-between rounded border p-3"
-                                    >
-                                        <div>
-                                            <p className="font-medium">
-                                                {upload.filename}
-                                            </p>
-                                            <p className="text-sm text-muted-foreground">
-                                                {formatSize(upload.filesize)}
-                                            </p>
-                                        </div>
-                                        <span className="text-sm text-green-600">
-                                            {upload.status}
-                                        </span>
+                    <div>
+                        <p className="text-lg font-medium text-foreground">
+                            Riwayat Upload
+                        </p>
+
+                        <div className="mt-2 space-y-2">
+                            {uploads.map((upload) => (
+                                <div
+                                    key={upload.id}
+                                    className="flex justify-between rounded-lg bg-gray-50 p-3"
+                                >
+                                    <div>
+                                        <p className="font-medium">
+                                            {upload.filename}
+                                        </p>
+                                        <p className="text-xs text-muted-foreground">
+                                            {formatSize(upload.filesize)}
+                                        </p>
                                     </div>
-                                ))}
-                            </div>
-                        </CardContent>
-                    </Card>
+                                    <span className="text-sm text-green-600">
+                                        <HugeiconsIcon
+                                            icon={CheckmarkSquare01Icon}
+                                            size={24}
+                                            color="currentColor"
+                                        />
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
                 )}
             </div>
         </AppLayout>
