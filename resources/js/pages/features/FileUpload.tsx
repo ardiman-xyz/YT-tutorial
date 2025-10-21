@@ -112,7 +112,7 @@ export default function FileUploadIndex({ uploads }: Props) {
             <Head title="Upload File" />
 
             <div className="mx-auto max-w-2xl space-y-6">
-                <div>
+                <div className="mt-2">
                     <h1 className="text-3xl font-bold">Upload File Besar</h1>
                     <p className="text-muted-foreground">
                         Upload dengan chunking method
