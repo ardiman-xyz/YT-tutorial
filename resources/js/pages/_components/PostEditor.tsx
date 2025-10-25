@@ -178,7 +178,7 @@ export function PostEditor({ user, onPostCreated }: PostEditorProps) {
             <div className="p-4">
                 <div className="flex gap-3">
                     {/* Avatar */}
-                    <Avatar className="h-12 w-12">
+                    <Avatar className="h-10 w-10">
                         <AvatarImage src={user.avatar} alt={user.name} />
                         <AvatarFallback className="bg-primary text-primary-foreground">
                             {user.name.substring(0, 2).toUpperCase()}

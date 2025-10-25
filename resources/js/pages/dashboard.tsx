@@ -1,143 +1,193 @@
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
-import { dashboard } from '@/routes';
-import { type BreadcrumbItem } from '@/types';
-import { Head } from '@inertiajs/react';
+import type { Post as PostType, User } from '@/types/post';
+import { Head, router, usePage } from '@inertiajs/react';
+import axios from 'axios';
+import { useState } from 'react';
+import { toast } from 'sonner';
 import { Post } from './_components/Post';
 import { PostEditor } from './_components/PostEditor';
-
-const breadcrumbs: BreadcrumbItem[] = [
-    {
-        title: 'Dashboard',
-        href: dashboard().url,
-    },
-];
+import { ReplyDialog } from './_components/ReplyDialog';
 
 export default function Dashboard() {
-    const mockPosts = [
-        {
-            id: 1,
-            user: {
-                id: 1,
-                name: 'Shelby',
-                username: 'shelbyserves',
-                avatar: 'https://i.pravatar.cc/150?img=1',
-                verified: true,
-            },
-            content:
-                'The network built to serve is now serving.\n\nShelby Devnet is live.\n\nStart testing with the CLI or SDK.',
-            media: [
-                {
-                    id: 1,
-                    url: 'https://picsum.photos/600/400?random=1',
-                    type: 'video' as const,
-                    thumbnail: 'https://picsum.photos/600/400?random=1',
-                    duration: '0:23',
+    const { posts: initialPosts, auth } = usePage<any>().props as {
+        posts: PostType[];
+        auth: { user: User };
+    };
+
+    const [posts, setPosts] = useState<PostType[]>(initialPosts);
+
+    const [deleteDialog, setDeleteDialog] = useState<{
+        open: boolean;
+        postId: number | null;
+    }>({
+        open: false,
+        postId: null,
+    });
+
+    const [replyDialog, setReplyDialog] = useState<{
+        open: boolean;
+        post: PostType | null;
+    }>({
+        open: false,
+        post: null,
+    });
+
+    const formatTimestamp = (dateString: string) => {
+        const date = new Date(dateString);
+        const now = new Date();
+        const diffMs = now.getTime() - date.getTime();
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+
+        if (diffMins < 1) return 'now';
+        if (diffMins < 60) return `${diffMins}m`;
+        if (diffHours < 24) return `${diffHours}h`;
+        if (diffDays < 7) return `${diffDays}d`;
+        return date.toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+        });
+    };
+
+    const handlePostCreated = () => {
+        router.reload({ only: ['posts'] });
+    };
+
+    const handleDeleteClick = (postId: number, e?: React.MouseEvent) => {
+        if (e) e.stopPropagation();
+        setDeleteDialog({ open: true, postId });
+    };
+
+    const handleDeleteConfirm = () => {
+        if (deleteDialog.postId) {
+            // Optimistic update - remove from UI immediately
+            setPosts((prevPosts) =>
+                prevPosts.filter((post) => post.id !== deleteDialog.postId),
+            );
+            setDeleteDialog({ open: false, postId: null });
+
+            // Send delete request
+            router.delete(`/posts/${deleteDialog.postId}`, {
+                preserveScroll: true,
+                onError: () => {
+                    // If error, reload to restore correct state
+                    router.reload({ only: ['posts'] });
                 },
-            ],
-            timestamp: '2h',
-            source: 'shelby.xyz',
-            likes: 44,
-            replies: 11,
-            reposts: 4,
-            views: 163000,
-            isLiked: false,
-            isReposted: false,
-            isBookmarked: false,
-        },
-        {
-            id: 2,
-            user: {
-                id: 2,
-                name: 'Tech News',
-                username: 'technews',
-                avatar: 'https://i.pravatar.cc/150?img=2',
-                verified: true,
-            },
-            content:
-                '🚀 Breaking: Next.js 14 is here with amazing new features including:\n\n• Turbopack stable\n• Server Actions stable\n• Partial Prerendering (Preview)\n• Metadata improvements\n\nTime to upgrade your projects! 🎉',
-            media: [],
-            timestamp: '4h',
-            source: 'Web',
-            likes: 1234,
-            replies: 89,
-            reposts: 234,
-            views: 45600,
-            isLiked: true,
-            isReposted: false,
-            isBookmarked: true,
-        },
-        {
-            id: 3,
-            user: {
-                id: 3,
-                name: 'Design Daily',
-                username: 'designdaily',
-                avatar: 'https://i.pravatar.cc/150?img=3',
-                verified: false,
-            },
-            content: 'Beautiful gradient collection for your next project 🎨',
-            media: [
-                {
-                    id: 1,
-                    url: 'https://picsum.photos/600/400?random=2',
-                    type: 'image' as const,
-                },
-                {
-                    id: 2,
-                    url: 'https://picsum.photos/600/400?random=3',
-                    type: 'image' as const,
-                },
-                {
-                    id: 3,
-                    url: 'https://picsum.photos/600/400?random=4',
-                    type: 'image' as const,
-                },
-                {
-                    id: 4,
-                    url: 'https://picsum.photos/600/400?random=5',
-                    type: 'image' as const,
-                },
-            ],
-            timestamp: '6h',
-            source: 'Web',
-            likes: 567,
-            replies: 23,
-            reposts: 45,
-            views: 12300,
-            isLiked: false,
-            isReposted: true,
-            isBookmarked: false,
-        },
-        {
-            id: 4,
-            user: {
-                id: 4,
-                name: 'Code Tips',
-                username: 'codetips',
-                avatar: 'https://i.pravatar.cc/150?img=4',
-                verified: true,
-            },
-            content:
-                '💡 Pro tip: Use React.memo() to prevent unnecessary re-renders in your React components.\n\nconst MemoizedComponent = React.memo(MyComponent, (prevProps, nextProps) => {\n  // Return true if props are equal\n  return prevProps.id === nextProps.id;\n});',
-            media: [
-                {
-                    id: 1,
-                    url: 'https://picsum.photos/600/800?random=6',
-                    type: 'image' as const,
-                },
-            ],
-            timestamp: '8h',
-            source: 'Web',
-            likes: 892,
-            replies: 45,
-            reposts: 123,
-            views: 23400,
-            isLiked: false,
-            isReposted: false,
-            isBookmarked: false,
-        },
-    ];
+            });
+        }
+    };
+
+    const handlePostClick = (post: PostType) => {
+        router.visit(`/status/${post.id}`);
+    };
+
+    const handleLike = async (postId: number, e?: React.MouseEvent) => {
+        if (e) e.stopPropagation();
+
+        try {
+            const response = await axios.post(`/posts/${postId}/like`);
+
+            // Update local state
+            setPosts((prevPosts) =>
+                prevPosts.map((post) => {
+                    if (post.id === postId) {
+                        return {
+                            ...post,
+                            is_liked: response.data.isLiked,
+                            likes_count: response.data.likesCount,
+                        };
+                    }
+                    return post;
+                }),
+            );
+        } catch (error) {
+            console.error('Error toggling like:', error);
+        }
+    };
+
+    const handleFollow = async (userId: number, e?: React.MouseEvent) => {
+        if (e) e.stopPropagation();
+
+        try {
+            const response = await axios.post(`/users/${userId}/follow`);
+
+            // Update local state
+            setPosts((prevPosts) =>
+                prevPosts.map((post) => {
+                    if (post.user.id === userId) {
+                        return {
+                            ...post,
+                            is_following: response.data.isFollowing,
+                        };
+                    }
+                    return post;
+                }),
+            );
+        } catch (error) {
+            console.error('Error toggling follow:', error);
+        }
+    };
+
+    const handleRepost = async (postId: number, e?: React.MouseEvent) => {
+        if (e) e.stopPropagation();
+
+        try {
+            const response = await axios.post(`/posts/${postId}/repost`);
+
+            // Update local state
+            setPosts((prevPosts) =>
+                prevPosts.map((post) => {
+                    if (post.id === postId) {
+                        return {
+                            ...post,
+                            is_reposted: response.data.isReposted,
+                            reposts_count: response.data.repostsCount,
+                        };
+                    }
+                    return post;
+                }),
+            );
+        } catch (error) {
+            console.error('Error toggling repost:', error);
+        }
+    };
+
+    const handleBookmark = async (postId: number, e?: React.MouseEvent) => {
+        if (e) e.stopPropagation();
+
+        try {
+            const response = await axios.post(`/posts/${postId}/bookmark`);
+
+            // Update local state
+            setPosts((prevPosts) =>
+                prevPosts.map((post) => {
+                    if (post.id === postId) {
+                        return {
+                            ...post,
+                            is_bookmarked: response.data.isBookmarked,
+                        };
+                    }
+                    return post;
+                }),
+            );
+
+            toast.success(
+                response.data.isBookmarked
+                    ? 'Post bookmarked'
+                    : 'Bookmark removed',
+            );
+        } catch (error) {
+            console.error('Error toggling bookmark:', error);
+        }
+    };
+
+    const handleReplyClick = (post: PostType, e?: React.MouseEvent) => {
+        if (e) e.stopPropagation();
+        setReplyDialog({ open: true, post });
+    };
 
     return (
         <AppLayout>
@@ -145,42 +195,93 @@ export default function Dashboard() {
 
             <div className="mx-auto max-w-2xl">
                 <PostEditor
-                    user={{
-                        id: 1,
-                        name: 'User Name',
-                        username: 'username',
-                        avatar: 'https://i.pravatar.cc/150?img=3',
-                    }}
-                    onPostCreated={() => {}}
+                    user={auth.user}
+                    onPostCreated={handlePostCreated}
                 />
 
-                <div className="border-b py-3 text-center">
-                    <Button variant="link" className="text-primary">
-                        Show 140 posts
-                    </Button>
-                </div>
+                {posts.length > 0 && (
+                    <div className="border-b py-3 text-center">
+                        <Button variant="link" className="text-primary">
+                            Show {posts.length} posts
+                        </Button>
+                    </div>
+                )}
 
                 <div className="divide-y divide-border">
-                    {mockPosts.map((post) => (
-                        <Post
+                    {posts.map((post) => (
+                        <div
                             key={post.id}
-                            {...post}
-                            onLike={() => console.log('Liked post', post.id)}
-                            onRepost={() => console.log('Reposted', post.id)}
-                            onBookmark={() =>
-                                console.log('Bookmarked', post.id)
-                            }
-                            onReply={() => console.log('Reply to', post.id)}
-                            onShare={() => console.log('Share', post.id)}
-                        />
+                            onClick={() => handlePostClick(post)}
+                            className="cursor-pointer"
+                        >
+                            <Post
+                                user={{
+                                    ...post.user,
+                                    verified: post.user.is_verified,
+                                }}
+                                content={post.content}
+                                media={post.media}
+                                timestamp={formatTimestamp(post.created_at)}
+                                likes={post.likes_count || 0}
+                                replies={post.replies_count || 0}
+                                reposts={post.reposts_count || 0}
+                                views={0}
+                                isLiked={post.is_liked || false}
+                                isReposted={post.is_reposted || false}
+                                isBookmarked={post.is_bookmarked || false}
+                                onLike={(e) => handleLike(post.id, e)}
+                                onRepost={(e) => handleRepost(post.id, e)}
+                                onReply={(e) => handleReplyClick(post, e)}
+                                onBookmark={(e) => handleBookmark(post.id, e)}
+                                onShare={() => {}}
+                                isFollowing={post.is_following || false}
+                                onFollow={(e) => handleFollow(post.user.id, e)}
+                                onDelete={
+                                    post.user_id === auth.user.id
+                                        ? () => handleDeleteClick(post.id)
+                                        : undefined
+                                }
+                            />
+                        </div>
                     ))}
                 </div>
 
-                <div className="p-4 text-center">
-                    <button className="text-primary hover:underline">
-                        Load more posts
-                    </button>
-                </div>
+                {posts.length === 0 && (
+                    <div className="p-8 text-center text-muted-foreground">
+                        <p className="text-lg font-semibold">No posts yet</p>
+                        <p className="mt-1 text-sm">
+                            Start following people or create your first post!
+                        </p>
+                    </div>
+                )}
+
+                <ConfirmDialog
+                    open={deleteDialog.open}
+                    onOpenChange={(open) =>
+                        setDeleteDialog({ open, postId: null })
+                    }
+                    onConfirm={handleDeleteConfirm}
+                    title="Delete post?"
+                    description="This action cannot be undone. Your post will be permanently deleted."
+                    confirmText="Delete"
+                    cancelText="Cancel"
+                    variant="destructive"
+                />
+
+                {replyDialog.post && (
+                    <ReplyDialog
+                        open={replyDialog.open}
+                        onOpenChange={(open) =>
+                            setReplyDialog({ open, post: null })
+                        }
+                        post={{
+                            id: replyDialog.post.id,
+                            content: replyDialog.post.content,
+                            user: replyDialog.post.user,
+                        }}
+                        currentUser={auth.user}
+                    />
+                )}
             </div>
         </AppLayout>
     );

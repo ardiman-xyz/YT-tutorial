@@ -1,6 +1,13 @@
 import { cn } from '@/lib/utils';
 import { Play } from 'lucide-react';
-import { PostMedia } from '../types';
+
+interface PostMedia {
+    id: number;
+    url: string;
+    type: 'image' | 'video' | 'gif';
+    thumbnail?: string;
+    duration?: string;
+}
 
 export function PostMediaGrid({ media }: { media: PostMedia[] }) {
     if (!media.length) return null;

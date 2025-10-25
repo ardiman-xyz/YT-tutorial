@@ -1,3 +1,4 @@
+import { LikeButton } from '@/components/like-button';
 import { Button } from '@/components/ui/button';
 import {
     Tooltip,
@@ -5,15 +6,13 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { cn } from '@/lib/utils';
-import {
-    Analytics01Icon,
-    BubbleChatIcon,
-    FavouriteIcon,
-    RepeatIcon,
-} from '@hugeicons/core-free-icons';
+import { formatNumber } from '@/lib/utils';
+import { Analytics01Icon } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
-import { Bookmark, Share } from 'lucide-react';
+import { Share } from 'lucide-react';
+import { BookmarkButton } from './BookmarkButton';
+import ChatButton from './ChatButton';
+import RepostButton from './RepostButton';
 
 interface PostActionsProps {
     replies: number;
@@ -23,11 +22,11 @@ interface PostActionsProps {
     isLiked: boolean;
     isReposted: boolean;
     isBookmarked: boolean;
-    onLike: () => void;
-    onRepost: () => void;
-    onReply: () => void;
-    onBookmark: () => void;
-    onShare: () => void;
+    onLike: (e?: React.MouseEvent) => void;
+    onRepost: (e?: React.MouseEvent) => void;
+    onReply: (e?: React.MouseEvent) => void;
+    onBookmark: (e?: React.MouseEvent) => void;
+    onShare: (e?: React.MouseEvent) => void;
 }
 
 export function PostActions({
@@ -44,12 +43,13 @@ export function PostActions({
     onBookmark,
     onShare,
 }: PostActionsProps) {
-    const formatNumber = (n: number) =>
-        n >= 1_000_000
-            ? (n / 1_000_000).toFixed(1) + 'M'
-            : n >= 1_000
-              ? (n / 1_000).toFixed(1) + 'K'
-              : n.toString();
+    const handleClick = (
+        callback: (e?: React.MouseEvent) => void,
+        e: React.MouseEvent,
+    ) => {
+        e.stopPropagation();
+        callback(e);
+    };
 
     return (
         <div className="mt-3 flex items-center justify-between">
@@ -57,12 +57,10 @@ export function PostActions({
                 {/* Reply */}
                 <Tooltip>
                     <TooltipTrigger asChild>
-                        <Button variant="ghost" size="sm" onClick={onReply}>
-                            <HugeiconsIcon icon={BubbleChatIcon} size={20} />
-                            <span className="ml-1.5 text-xs">
-                                {formatNumber(replies)}
-                            </span>
-                        </Button>
+                        <ChatButton
+                            comments={replies}
+                            onClick={(e) => handleClick(onReply, e)}
+                        />
                     </TooltipTrigger>
                     <TooltipContent>Reply</TooltipContent>
                 </Tooltip>
@@ -70,34 +68,25 @@ export function PostActions({
                 {/* Repost */}
                 <Tooltip>
                     <TooltipTrigger asChild>
-                        <Button variant="ghost" size="sm" onClick={onRepost}>
-                            <HugeiconsIcon
-                                icon={RepeatIcon}
-                                size={20}
-                                color={isReposted ? 'green' : 'currentColor'}
-                            />
-                            <span className="ml-1.5 text-xs">
-                                {formatNumber(reposts)}
-                            </span>
-                        </Button>
+                        <RepostButton
+                            isReposted={isReposted}
+                            reposts={reposts}
+                            onRepost={(e) => handleClick(onRepost, e)}
+                        />
                     </TooltipTrigger>
                     <TooltipContent>Repost</TooltipContent>
                 </Tooltip>
 
-                {/* Like */}
+                {/* Like - Animated */}
                 <Tooltip>
                     <TooltipTrigger asChild>
-                        <Button variant="ghost" size="sm" onClick={onLike}>
-                            <HugeiconsIcon
-                                icon={FavouriteIcon}
-                                size={20}
-                                color={isLiked ? 'red' : 'currentColor'}
-                                className={cn(isLiked && 'fill-red-500')}
+                        <div>
+                            <LikeButton
+                                isLiked={isLiked}
+                                count={likes}
+                                onClick={(e) => handleClick(onLike, e)}
                             />
-                            <span className="ml-1.5 text-xs">
-                                {formatNumber(likes)}
-                            </span>
-                        </Button>
+                        </div>
                     </TooltipTrigger>
                     <TooltipContent>Like</TooltipContent>
                 </Tooltip>
@@ -117,16 +106,30 @@ export function PostActions({
 
                 {/* Bookmark & Share */}
                 <div className="flex items-center">
-                    <Button variant="ghost" size="icon" onClick={onBookmark}>
-                        <Bookmark
-                            className={cn(
-                                isBookmarked && 'fill-blue-500 text-blue-500',
-                            )}
-                        />
-                    </Button>
-                    <Button variant="ghost" size="icon" onClick={onShare}>
-                        <Share className="h-4 w-4" />
-                    </Button>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <div>
+                                <BookmarkButton
+                                    isBookmarked={isBookmarked}
+                                    onClick={(e) => handleClick(onBookmark, e)}
+                                />
+                            </div>
+                        </TooltipTrigger>
+                        <TooltipContent>Bookmark</TooltipContent>
+                    </Tooltip>
+
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={(e) => handleClick(onShare, e)}
+                            >
+                                <Share className="h-4 w-4" />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Share</TooltipContent>
+                    </Tooltip>
                 </div>
             </TooltipProvider>
         </div>

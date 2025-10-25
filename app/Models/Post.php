@@ -4,235 +4,164 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Post extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory;
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var array<int, string>
-     */
     protected $fillable = [
         'user_id',
         'content',
         'parent_id',
-        'is_repost',
-        'original_post_id',
         'reply_permission',
-        'replies_count',
-        'reposts_count',
-        'likes_count',
         'views_count',
-        'bookmarks_count',
+    ];
+
+    protected $casts = [
+        'views_count' => 'integer',
     ];
 
     /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
+     * Get the user that owns the post.
      */
-    protected function casts(): array
-    {
-        return [
-            'is_repost' => 'boolean',
-            'replies_count' => 'integer',
-            'reposts_count' => 'integer',
-            'likes_count' => 'integer',
-            'views_count' => 'integer',
-            'bookmarks_count' => 'integer',
-        ];
-    }
-
-    // User relationship
-    public function user(): BelongsTo
+    public function user()
     {
         return $this->belongsTo(User::class);
     }
 
-    // Media relationship
-    public function media(): HasMany
+    /**
+     * Get the media for the post.
+     */
+    public function media()
     {
-        return $this->hasMany(Media::class)->orderBy('order');
+        return $this->hasMany(Media::class);
     }
 
-    // Likes relationship
-    public function likes(): HasMany
+    /**
+     * Get the hashtags for the post.
+     */
+    public function hashtags()
     {
-        return $this->hasMany(Like::class);
+        return $this->belongsToMany(Hashtag::class, 'post_hashtags');
     }
 
-    public function likedByUsers(): BelongsToMany
-    {
-        return $this->belongsToMany(User::class, 'likes')
-            ->withTimestamps();
-    }
-
-    // Bookmarks relationship
-    public function bookmarks(): HasMany
-    {
-        return $this->hasMany(Bookmark::class);
-    }
-
-    public function bookmarkedByUsers(): BelongsToMany
-    {
-        return $this->belongsToMany(User::class, 'bookmarks')
-            ->withTimestamps();
-    }
-
-    // Parent post (untuk reply)
-    public function parent(): BelongsTo
-    {
-        return $this->belongsTo(Post::class, 'parent_id');
-    }
-
-    // Replies (posts yang reply ke post ini)
-    public function replies(): HasMany
-    {
-        return $this->hasMany(Post::class, 'parent_id');
-    }
-
-    // Original post (untuk repost)
-    public function originalPost(): BelongsTo
-    {
-        return $this->belongsTo(Post::class, 'original_post_id');
-    }
-
-    // Reposts (posts yang repost post ini)
-    public function reposts(): HasMany
-    {
-        return $this->hasMany(Post::class, 'original_post_id')
-            ->where('is_repost', true);
-    }
-
-    // Hashtags relationship
-    public function hashtags(): BelongsToMany
-    {
-        return $this->belongsToMany(Hashtag::class, 'hashtag_post')
-            ->withTimestamps();
-    }
-
-    // Mentions relationship
-    public function mentions(): HasMany
+    /**
+     * Get the mentions in the post.
+     */
+    public function mentions()
     {
         return $this->hasMany(Mention::class);
     }
 
-    public function mentionedUsers(): BelongsToMany
+    /**
+     * Get the parent post (for replies).
+     */
+    public function parent()
     {
-        return $this->belongsToMany(User::class, 'mentions')
-            ->withTimestamps();
+        return $this->belongsTo(Post::class, 'parent_id');
     }
 
-    // Notifications relationship
-    public function notifications(): HasMany
+    /**
+     * Get the replies to this post.
+     */
+    public function replies()
     {
-        return $this->hasMany(Notification::class);
+        return $this->hasMany(Post::class, 'parent_id');
     }
 
-    // Scopes
-    public function scopeWithoutReplies($query)
+    /**
+     * Get the likes for the post.
+     */
+    public function likes()
     {
-        return $query->whereNull('parent_id');
+        return $this->hasMany(Like::class);
     }
 
-    public function scopeOnlyReplies($query)
+    /**
+     * Get users who liked this post.
+     */
+    public function likedBy()
     {
-        return $query->whereNotNull('parent_id');
+        return $this->belongsToMany(User::class, 'likes')->withTimestamps();
     }
 
-    public function scopeWithoutReposts($query)
+    /**
+     * Check if user has liked this post.
+     */
+    public function isLikedBy(User $user)
     {
-        return $query->where('is_repost', false);
+        return $this->likes()->where('user_id', $user->id)->exists();
     }
 
-    public function scopeOnlyReposts($query)
+    /**
+     * Get likes count.
+     */
+    public function likesCount()
     {
-        return $query->where('is_repost', true);
+        return $this->likes()->count();
     }
 
-    // Helper methods
-    public function isReply(): bool
+    /**
+     * Get the reposts for the post.
+     */
+    public function reposts()
     {
-        return !is_null($this->parent_id);
+        return $this->hasMany(Repost::class);
     }
 
-    public function isRepost(): bool
+    /**
+     * Get users who reposted this post.
+     */
+    public function repostedBy()
     {
-        return $this->is_repost;
+        return $this->belongsToMany(User::class, 'reposts')->withTimestamps();
     }
 
-    public function isQuoteTweet(): bool
+    /**
+     * Check if user has reposted this post.
+     */
+    public function isRepostedBy(User $user)
     {
-        return $this->is_repost && !is_null($this->content);
+        return $this->reposts()->where('user_id', $user->id)->exists();
     }
 
-    public function canReply(User $user): bool
+    /**
+     * Get reposts count.
+     */
+    public function repostsCount()
     {
-        if ($this->reply_permission === 'everyone') {
-            return true;
-        }
-
-        if ($this->reply_permission === 'following') {
-            return $this->user->isFollowedBy($user) || $this->user_id === $user->id;
-        }
-
-        if ($this->reply_permission === 'mentioned') {
-            return $this->mentionedUsers()->where('user_id', $user->id)->exists() 
-                || $this->user_id === $user->id;
-        }
-
-        return false;
+        return $this->reposts()->count();
     }
 
-    // Increment counters
-    public function incrementRepliesCount(): void
+    /**
+     * Get the bookmarks for the post.
+     */
+    public function bookmarks()
     {
-        $this->increment('replies_count');
+        return $this->hasMany(Bookmark::class);
     }
 
-    public function decrementRepliesCount(): void
+    /**
+     * Get users who bookmarked this post.
+     */
+    public function bookmarkedBy()
     {
-        $this->decrement('replies_count');
+        return $this->belongsToMany(User::class, 'bookmarks')->withTimestamps();
     }
 
-    public function incrementRepostsCount(): void
+    /**
+     * Check if user has bookmarked this post.
+     */
+    public function isBookmarkedBy(User $user)
     {
-        $this->increment('reposts_count');
+        return $this->bookmarks()->where('user_id', $user->id)->exists();
     }
 
-    public function decrementRepostsCount(): void
+    /**
+     * Get bookmarks count.
+     */
+    public function bookmarksCount()
     {
-        $this->decrement('reposts_count');
-    }
-
-    public function incrementLikesCount(): void
-    {
-        $this->increment('likes_count');
-    }
-
-    public function decrementLikesCount(): void
-    {
-        $this->decrement('likes_count');
-    }
-
-    public function incrementViewsCount(): void
-    {
-        $this->increment('views_count');
-    }
-
-    public function incrementBookmarksCount(): void
-    {
-        $this->increment('bookmarks_count');
-    }
-
-    public function decrementBookmarksCount(): void
-    {
-        $this->decrement('bookmarks_count');
+        return $this->bookmarks()->count();
     }
 }

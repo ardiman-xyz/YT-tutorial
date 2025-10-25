@@ -2,21 +2,26 @@ import LeftSidebar from '@/components/LeftSidebar';
 import RightSidebar from '@/components/RightSidebar';
 import { Toaster } from 'sonner';
 
-export default function AppLayout({ children }: { children: React.ReactNode }) {
+type AppLayoutProps = {
+    children: React.ReactNode;
+    isRightSidebarOpen?: boolean; // 👉 parameter baru (opsional)
+};
+
+export default function AppLayout({
+    children,
+    isRightSidebarOpen = true,
+}: AppLayoutProps) {
     return (
         <div className="flex justify-center">
-            <Toaster position="top-center" />
+            <Toaster position="bottom-center" />
 
             {/* Sidebar kiri */}
             <LeftSidebar />
 
             {/* Konten utama */}
-            <main className="min-h-screen w-full max-w-2xl border-x">
-                {children}
-            </main>
+            <main className="min-h-screen w-full max-w-2xl">{children}</main>
 
-            {/* Sidebar kanan */}
-            <RightSidebar />
+            {isRightSidebarOpen && <RightSidebar />}
         </div>
     );
 }

@@ -1,3 +1,11 @@
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
     AiSearch02Icon,
     AllBookmarkIcon,
@@ -9,11 +17,28 @@ import {
     UserMultiple02Icon,
 } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
-import { usePage } from '@inertiajs/react';
+import { router, usePage } from '@inertiajs/react';
+import { LogOut, MoreHorizontal, User } from 'lucide-react';
 import NavItem from './NavItem';
 
+interface User {
+    id: number;
+    name: string;
+    username: string;
+    avatar?: string;
+}
+
 export default function LeftSidebar() {
-    const { url } = usePage();
+    const { url, props } = usePage<{ auth: { user: User } }>();
+    const user = props.auth?.user;
+
+    const handleLogout = () => {
+        router.post('/logout');
+    };
+
+    const handleProfile = () => {
+        router.visit(`/profile/${user.id}`);
+    };
 
     return (
         <aside className="sticky top-0 h-screen w-64 p-4">
@@ -103,8 +128,8 @@ export default function LeftSidebar() {
                             Communities
                         </NavItem>
                         <NavItem
-                            href="/profile"
-                            active={url === '/profile'}
+                            href={`/profile/${user?.id}`}
+                            active={url === `/profile/${user?.id}`}
                             icon={
                                 <HugeiconsIcon
                                     icon={UserIcon}
@@ -135,13 +160,42 @@ export default function LeftSidebar() {
                     </button>
                 </div>
 
-                <div className="mt-auto flex items-center gap-3 rounded-full p-2 hover:bg-gray-100">
-                    <div className="h-10 w-10 rounded-full bg-gray-300" />
-                    <div>
-                        <p className="text-sm font-semibold">User Name</p>
-                        <p className="text-xs text-gray-500">@username</p>
-                    </div>
-                </div>
+                {/* User Menu */}
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <button className="mt-auto flex w-full items-center gap-3 rounded-full p-3 transition-colors hover:bg-muted">
+                            <Avatar className="h-10 w-10">
+                                <AvatarImage
+                                    src={user?.avatar}
+                                    alt={user?.name}
+                                />
+                                <AvatarFallback>
+                                    {user?.name?.substring(0, 2).toUpperCase()}
+                                </AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1 text-left">
+                                <p className="text-sm font-semibold">
+                                    {user?.name}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                    @{user?.username}
+                                </p>
+                            </div>
+                            <MoreHorizontal className="h-5 w-5 text-muted-foreground" />
+                        </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56">
+                        <DropdownMenuItem onClick={handleProfile}>
+                            <User className="mr-2 h-4 w-4" />
+                            <span>Profile</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={handleLogout}>
+                            <LogOut className="mr-2 h-4 w-4" />
+                            <span>Log out @{user?.username}</span>
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
             </div>
         </aside>
     );
