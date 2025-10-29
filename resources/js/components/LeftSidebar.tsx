@@ -1,3 +1,5 @@
+// resources/js/layouts/partials/LeftSidebar.tsx
+
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
     DropdownMenu,
@@ -28,7 +30,15 @@ interface User {
     avatar?: string;
 }
 
-export default function LeftSidebar() {
+interface LeftSidebarProps {
+    unreadCount: number;
+    clearUnreadCount: () => void;
+}
+
+export default function LeftSidebar({
+    unreadCount,
+    clearUnreadCount,
+}: LeftSidebarProps) {
     const { url, props } = usePage<{ auth: { user: User } }>();
     const user = props.auth?.user;
 
@@ -38,6 +48,11 @@ export default function LeftSidebar() {
 
     const handleProfile = () => {
         router.visit(`/profile/${user.id}`);
+    };
+
+    const handleNotificationClick = () => {
+        clearUnreadCount();
+        router.visit('/notifications');
     };
 
     return (
@@ -75,19 +90,34 @@ export default function LeftSidebar() {
                         >
                             Explore
                         </NavItem>
-                        <NavItem
-                            href="/notifications"
-                            active={url === '/notifications'}
-                            icon={
-                                <HugeiconsIcon
-                                    icon={Notification01Icon}
-                                    size={24}
-                                    color="currentColor"
-                                />
-                            }
-                        >
-                            Notifications
-                        </NavItem>
+
+                        {/* Notifications with Badge */}
+                        <div className="relative">
+                            <NavItem
+                                href="/notifications"
+                                active={url === '/notifications'}
+                                onClick={handleNotificationClick}
+                                icon={
+                                    <div className="relative">
+                                        <HugeiconsIcon
+                                            icon={Notification01Icon}
+                                            size={24}
+                                            color="currentColor"
+                                        />
+                                        {unreadCount > 0 && (
+                                            <span className="absolute -top-1 -right-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-primary px-1 text-xs font-bold text-primary-foreground">
+                                                {unreadCount > 9
+                                                    ? '9+'
+                                                    : unreadCount}
+                                            </span>
+                                        )}
+                                    </div>
+                                }
+                            >
+                                Notifications
+                            </NavItem>
+                        </div>
+
                         <NavItem
                             href="/messages"
                             active={url === '/messages'}

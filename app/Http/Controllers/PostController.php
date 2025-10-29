@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\PostLiked;
 use App\Models\Post;
 use App\Models\Hashtag;
 use App\Models\Mention;
+use App\Models\Notification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -196,24 +198,40 @@ class PostController extends Controller
     /**
      * Toggle like on a post.
      */
-    public function toggleLike(Post $post)
+   public function toggleLike(Post $post)
     {
         $user = auth()->user();
-
         $existingLike = $post->likes()->where('user_id', $user->id)->first();
 
         if ($existingLike) {
             $existingLike->delete();
+            
+            Notification::where([
+                'user_id' => $post->user_id,
+                'actor_id' => $user->id,
+                'post_id' => $post->id,
+                'type' => 'like'
+            ])->delete();
+            
             $isLiked = false;
         } else {
             $post->likes()->create([
                 'user_id' => $user->id,
             ]);
+            
+            if ($post->user_id !== $user->id) {
+                Notification::create([
+                    'user_id' => $post->user_id,
+                    'actor_id' => $user->id,
+                    'type' => 'like',
+                    'post_id' => $post->id,
+                    'is_read' => false,
+                ]);
+                
+                broadcast(new PostLiked($post, $user));
+            }
+            
             $isLiked = true;
-
-            // if ($post->user_id !== $user->id) {
-            //     broadcast(new LikeNotification($post, $user))->toOthers();
-            // }
         }
 
         return response()->json([

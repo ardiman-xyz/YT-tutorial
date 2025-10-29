@@ -1,10 +1,15 @@
+// resources/js/pages/notifications/index.tsx
+
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import AppLayout from '@/layouts/app-layout';
 import type { User } from '@/types/post';
 import { Head, router, usePage } from '@inertiajs/react';
+import { useEcho } from '@laravel/echo-react';
+import axios from 'axios';
 import { formatDistanceToNow } from 'date-fns';
+import { useEffect, useState } from 'react';
 
 import {
     AddTeamIcon,
@@ -15,7 +20,7 @@ import {
 } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
 
-import { CheckCheck, Heart, Settings } from 'lucide-react';
+import { CheckCheck, Settings } from 'lucide-react';
 
 interface Notification {
     id: number;
@@ -43,13 +48,64 @@ interface NotificationsData {
 }
 
 export default function Notifications() {
-    const { auth, notifications } = usePage<any>().props as {
+    const { auth, notifications: initialNotifications } = usePage<any>()
+        .props as {
         auth: { user: User };
         notifications: NotificationsData;
     };
 
-    const handleNotificationClick = (notification: Notification) => {
-        // Mark as read and navigate
+    const [notifications, setNotifications] =
+        useState<NotificationsData>(initialNotifications);
+
+    useEcho(`user.${auth.user.id}`, '.PostLiked', (data: any) => {
+        console.log('🔔 New notification received:', data);
+
+        const newNotification: Notification = {
+            id: Date.now(),
+            type: 'like',
+            user: {
+                id: 0,
+                name: data.liker_name,
+                username: data.liker_username,
+                avatar: data.liker_avatar,
+                is_verified: false,
+            },
+            post: {
+                id: data.post_id,
+                content: data.post_content,
+            },
+            created_at: data.timestamp,
+            read_at: null,
+        };
+
+        setNotifications((prev) => ({
+            all: [newNotification, ...prev.all],
+            verified: prev.verified,
+            mentions: prev.mentions,
+        }));
+    });
+
+    // Mark all as read when page loads
+    useEffect(() => {
+        const markAllRead = async () => {
+            try {
+                await axios.post('/notifications/mark-all-read');
+                console.log('✅ Marked all notifications as read');
+            } catch (error) {
+                console.error('❌ Failed to mark as read:', error);
+            }
+        };
+
+        markAllRead();
+    }, []);
+
+    const handleNotificationClick = async (notification: Notification) => {
+        try {
+            await axios.post(`/notifications/${notification.id}/read`);
+        } catch (error) {
+            console.error('Failed to mark as read:', error);
+        }
+
         if (notification.type === 'follow') {
             router.visit(`/profile/${notification.user.id}`);
         } else if (notification.post) {
@@ -57,9 +113,28 @@ export default function Notifications() {
         }
     };
 
-    const handleMarkAllRead = () => {
-        // TODO: Implement mark all as read
-        console.log('Mark all as read');
+    const handleMarkAllRead = async () => {
+        try {
+            await axios.post('/notifications/mark-all-read');
+
+            // Update local state
+            setNotifications((prev) => ({
+                all: prev.all.map((n) => ({
+                    ...n,
+                    read_at: new Date().toISOString(),
+                })),
+                verified: prev.verified.map((n) => ({
+                    ...n,
+                    read_at: new Date().toISOString(),
+                })),
+                mentions: prev.mentions.map((n) => ({
+                    ...n,
+                    read_at: new Date().toISOString(),
+                })),
+            }));
+        } catch (error) {
+            console.error('Failed to mark all as read:', error);
+        }
     };
 
     const getNotificationIcon = (type: string) => {
@@ -303,7 +378,12 @@ export default function Notifications() {
                                 <div className="p-8 text-center">
                                     <div className="mb-2 flex justify-center">
                                         <div className="rounded-full bg-muted p-4">
-                                            <Heart className="h-8 w-8 text-muted-foreground" />
+                                            <HugeiconsIcon
+                                                icon={FavouriteIcon}
+                                                size={24}
+                                                color="currentColor"
+                                                className="text-blue-500"
+                                            />
                                         </div>
                                     </div>
                                     <p className="text-lg font-semibold">

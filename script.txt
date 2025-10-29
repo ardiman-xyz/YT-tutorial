@@ -1,0 +1,472 @@
+# Tutorial: Membuat Clone Twitter/X dengan Laravel + Inertia + React + TypeScript
+## Channel: the void main
+
+---
+
+## 🎬 OPENING VIDEO
+
+**[INTRO ANIMATION - Logo "the void main" muncul dengan efek glitch]**
+
+**[MUSIC: Upbeat tech music fades in]**
+
+**Host:**
+> "Halo developers! Selamat datang kembali di channel **the void main** - tempat dimana kita masuk ke dalam void dan keluar dengan kode yang powerful!"
+
+**[CUT TO: Preview aplikasi Twitter/X clone yang akan dibuat]**
+
+**Host:**
+> "Di series tutorial kali ini, kita akan membuat sesuatu yang EPIC - sebuah **Twitter Clone** atau kalau sekarang lebih dikenal sebagai **X Clone** - menggunakan tech stack modern yang production-ready!"
+
+**[ANIMATED TEXT MUNCUL:]**
+- ⚡ Laravel 12
+- 🔄 Inertia.js
+- ⚛️ React 19
+- 📘 TypeScript
+- 🎨 Tailwind CSS 4
+- 🔐 Laravel Fortify & Sanctum
+- 🚀 dan masih banyak lagi!
+
+**Host:**
+> "Kenapa tutorial ini SPECIAL? Karena kita nggak cuma copy-paste code. Kita akan memahami setiap konsep, dari authentication, real-time notifications pakai Laravel Reverb, sampai optimasi performa!"
+
+**[SHOW: Feature list dengan checkmarks]**
+- ✅ Authentication & Authorization
+- ✅ Tweet, Retweet, Like, Comment
+- ✅ Follow/Unfollow System
+- ✅ Real-time Notifications
+- ✅ Media Upload
+- ✅ User Profiles & Timeline
+- ✅ Search & Hashtags
+- ✅ Dark Mode
+- ✅ Dan masih banyak lagi!
+
+**Host:**
+> "Tech stack yang kita pakai ini adalah kombinasi yang sangat powerful dan banyak digunakan di industri. Laravel untuk backend yang robust, Inertia untuk menghubungkan backend dan frontend tanpa membuat API, React untuk UI yang interaktif, dan TypeScript untuk type safety yang bikin kode kita lebih maintainable."
+
+**[CUT TO: Host di depan screen]**
+
+**Host:**
+> "Tutorial ini cocok untuk kalian yang sudah punya basic Laravel dan React. Tapi tenang, saya akan jelaskan step by step dengan detail!"
+
+**Host:**
+> "So, grab your coffee ☕, siapkan text editor favorit kalian, dan let's dive into the void! Tapi sebelumnya, jangan lupa SUBSCRIBE, nyalakan notifikasi, dan LIKE video ini untuk support channel the void main!"
+
+**[TRANSITION: Smooth fade ke Part 1]**
+
+---
+
+## 📦 PART 1: Setup & Installation
+
+**[TITLE SCREEN: "Part 1 - Setup & Installation"]**
+
+**Host:**
+> "Okay, let's start from zero! Di part pertama ini, kita akan setup environment dan install semua dependency yang kita butuhkan."
+
+### 1️⃣ Requirements Check
+
+**Host:**
+> "Sebelum mulai, pastikan kalian sudah install tools berikut di komputer kalian:"
+
+**[SHOW CHECKLIST ON SCREEN]**
+
+```bash
+# Check PHP version (minimum 8.2)
+php -v
+
+# Check Composer
+composer -V
+
+# Check Node.js (minimum v18)
+node -v
+
+# Check NPM
+npm -v
+
+# Check Git
+git --version
+```
+
+**Host:**
+> "Kalau ada yang belum terinstall, silakan install dulu ya. Untuk PHP, kalian bisa pakai XAMPP, Laragon, atau Herd. Untuk Node.js, download dari nodejs.org."
+
+---
+
+### 2️⃣ Create Laravel Project
+
+**Host:**
+> "Okay, sekarang kita mulai! Pertama, kita akan create Laravel project baru. Buka terminal kalian di folder dimana kalian ingin menyimpan project ini."
+
+**[SCREEN RECORDING: Terminal command]**
+
+```bash
+# Create new Laravel project
+composer create-project laravel/laravel twitter-clone
+
+# Masuk ke folder project
+cd twitter-clone
+```
+
+**Host:**
+> "Command ini akan download Laravel versi terbaru dan setup basic project structure. Tunggu beberapa menit sampai selesai."
+
+**[SHOW: Project structure di VSCode]**
+
+**Host:**
+> "Great! Sekarang kita punya Laravel project yang fresh. Next, kita akan install dependencies yang kita butuhkan."
+
+---
+
+### 3️⃣ Install Backend Dependencies
+
+**Host:**
+> "Sekarang kita install package-package Laravel yang kita butuhkan. Ini semua package yang production-ready dan well-maintained."
+
+**[SCREEN RECORDING: Running composer commands]**
+
+```bash
+# Install Inertia Laravel adapter
+composer require inertiajs/inertia-laravel
+
+# Install Laravel Fortify untuk authentication
+composer require laravel/fortify
+
+# Install Laravel Sanctum untuk API authentication
+composer require laravel/sanctum
+
+# Install Laravel Reverb untuk real-time features
+composer require laravel/reverb
+
+# Install Pusher PHP Server
+composer require pusher/pusher-php-server
+
+# Install Laravel Wayfinder untuk routing
+composer require laravel/wayfinder
+```
+
+**Host:**
+> "Mari saya jelaskan satu-satu ya:"
+
+**[ANIMATED EXPLANATION dengan icons]**
+
+- **Inertia.js**: Bridge antara Laravel dan React, jadi kita nggak perlu bikin REST API secara manual
+- **Fortify**: Handle authentication logic (login, register, reset password, dll)
+- **Sanctum**: API authentication, kalau nanti kita mau bikin mobile app
+- **Reverb**: Laravel's official websocket server untuk real-time notifications
+- **Pusher**: Client library untuk broadcasting events
+- **Wayfinder**: Advanced routing untuk Inertia apps
+
+---
+
+### 4️⃣ Install Development Dependencies
+
+**Host:**
+> "Kita juga butuh beberapa dev dependencies untuk testing dan code quality."
+
+```bash
+# Install Pest untuk testing (lebih modern dari PHPUnit)
+composer require pestphp/pest pestphp/pest-plugin-laravel --dev
+
+# Install Laravel Pint untuk code formatting
+composer require laravel/pint --dev
+
+# Install Laravel Pail untuk better log viewing
+composer require laravel/pail --dev
+
+# Install Laravel Sail (optional, untuk Docker)
+composer require laravel/sail --dev
+```
+
+**Host:**
+> "Pest itu testing framework yang lebih modern dan readable. Pint untuk auto-format PHP code kita. Pail untuk view logs dengan lebih cantik. Dan Sail kalau kalian mau pakai Docker."
+
+---
+
+### 5️⃣ Setup Frontend dengan Inertia + React + TypeScript
+
+**Host:**
+> "Nah, sekarang bagian yang exciting! Kita setup React dengan TypeScript. Laravel by default pakai Blade, tapi kita akan replace dengan React."
+
+**[SCREEN RECORDING: Installing Node dependencies]**
+
+```bash
+# Install Vite React plugin
+npm install @vitejs/plugin-react --save-dev
+
+# Install Inertia React adapter
+npm install @inertiajs/react
+
+# Install React & React DOM
+npm install react react-dom
+
+# Install TypeScript & types
+npm install -D typescript @types/react @types/react-dom @types/node
+
+# Install Tailwind CSS 4
+npm install tailwindcss @tailwindcss/vite --save-dev
+
+# Install shadcn/ui dependencies (Radix UI)
+npm install @radix-ui/react-dialog @radix-ui/react-dropdown-menu @radix-ui/react-avatar
+npm install @radix-ui/react-checkbox @radix-ui/react-label @radix-ui/react-select
+npm install @radix-ui/react-separator @radix-ui/react-slot @radix-ui/react-tabs
+npm install @radix-ui/react-tooltip @radix-ui/react-alert-dialog @radix-ui/react-progress
+npm install @radix-ui/react-toggle @radix-ui/react-toggle-group @radix-ui/react-collapsible
+npm install @radix-ui/react-navigation-menu
+
+# Install utility libraries
+npm install class-variance-authority clsx tailwind-merge
+npm install lucide-react # Icon library
+npm install @hugeicons/react @hugeicons/core-free-icons # Alternative icons
+npm install sonner # Toast notifications
+npm install next-themes # Dark mode support
+npm install date-fns # Date manipulation
+npm install input-otp # OTP input component
+
+# Install Laravel specific
+npm install laravel-vite-plugin
+npm install @laravel/vite-plugin-wayfinder --save-dev
+npm install @laravel/echo-react laravel-echo pusher-js --save-dev
+
+# Install developer tools
+npm install -D eslint @eslint/js typescript-eslint
+npm install -D eslint-plugin-react eslint-plugin-react-hooks eslint-config-prettier
+npm install -D prettier prettier-plugin-organize-imports prettier-plugin-tailwindcss
+npm install -D concurrently # Run multiple commands
+npm install -D globals # ESLint globals
+```
+
+**Host:**
+> "Wah banyak banget ya? Tenang, ini semua penting dan akan kita pakai nanti. Let me break it down:"
+
+**[ANIMATED BREAKDOWN]**
+
+**Core Framework:**
+- React & React DOM - JavaScript framework
+- TypeScript - Type safety
+- Inertia React - Bridge ke Laravel
+
+**UI & Styling:**
+- Tailwind CSS 4 - Utility-first CSS framework (latest version!)
+- Radix UI - Headless UI components (foundation untuk shadcn/ui)
+- Lucide React & HugeIcons - Icon libraries
+- Sonner - Beautiful toast notifications
+- Next Themes - Dark mode support
+
+**Laravel Integration:**
+- Laravel Vite Plugin - Build tool
+- Wayfinder Plugin - Routing helper
+- Laravel Echo - WebSocket client
+- Pusher JS - Real-time events
+
+**Developer Experience:**
+- ESLint - Code linting
+- Prettier - Code formatting
+- Concurrently - Run multiple dev commands
+- TypeScript compiler - Type checking
+
+---
+
+### 6️⃣ Verify Installation
+
+**Host:**
+> "Okay, sekarang kita verify semua sudah terinstall dengan benar. Check file `composer.json` dan `package.json` kalian."
+
+**[SHOW: composer.json file]**
+
+```json
+{
+    "require": {
+        "php": "^8.2",
+        "inertiajs/inertia-laravel": "^2.0",
+        "laravel/fortify": "^1.30",
+        "laravel/framework": "^12.0",
+        "laravel/reverb": "^1.0",
+        "laravel/sanctum": "^4.0",
+        "laravel/wayfinder": "^0.1.9",
+        "pusher/pusher-php-server": "^7.2"
+    }
+}
+```
+
+**[SHOW: package.json file]**
+
+```json
+{
+    "dependencies": {
+        "@inertiajs/react": "^2.1.4",
+        "react": "^19.0.0",
+        "react-dom": "^19.0.0",
+        "tailwindcss": "^4.0.0",
+        "typescript": "^5.7.2",
+        "axios": "^1.12.2",
+        "@radix-ui/react-*": "latest",
+        // ... dan lainnya
+    }
+}
+```
+
+**Host:**
+> "Perfect! Semua dependency sudah terinstall. Sekarang kita check apakah ada error."
+
+```bash
+# Update composer autoload
+composer dump-autoload
+
+# Clear any cache
+php artisan config:clear
+php artisan cache:clear
+```
+
+---
+
+### 7️⃣ Next Steps Preview
+
+**Host:**
+> "Excellent! Setup installation sudah selesai. Di part berikutnya, kita akan:"
+
+**[ANIMATED LIST]**
+1. ⚙️ Configure Laravel & Inertia
+2. 📁 Setup project structure
+3. 🎨 Configure Tailwind & create design system
+4. 🔐 Setup authentication dengan Fortify
+5. 📝 Create database schema
+6. 🎯 Build first component!
+
+**Host:**
+> "Jadi pastikan kalian save project ini, dan kita lanjut di video berikutnya!"
+
+---
+
+## 🎬 CLOSING
+
+**Host:**
+> "That's it untuk part 1! Kita sudah berhasil setup Laravel project dan install semua dependencies yang kita butuhkan untuk build Twitter clone."
+
+**Host:**
+> "Kalau ada pertanyaan, drop di comment section ya! Dan jangan lupa check description untuk link ke repository GitHub project ini."
+
+**Host:**
+> "See you di part 2 where kita akan mulai coding! Stay tuned, and happy coding! 🚀"
+
+**[OUTRO ANIMATION]**
+**Text appear:** 
+- 👍 LIKE this video
+- 💬 COMMENT your questions  
+- 🔔 SUBSCRIBE for more
+- 📱 Follow @thevoidmain
+
+**[LOGO: "the void main" with tagline: "return knowledge;"]**
+
+**[END SCREEN: Next video preview + Subscribe button]**
+
+---
+
+## 📝 VIDEO DESCRIPTION TEMPLATE
+
+```
+🚀 Membuat Twitter/X Clone dengan Laravel 12 + Inertia + React + TypeScript - Part 1: Setup & Installation
+
+Di series tutorial ini, kita akan membuat full-stack Twitter/X clone menggunakan tech stack modern!
+
+⏱️ TIMESTAMPS:
+00:00 - Intro
+01:30 - Requirements Check
+03:00 - Create Laravel Project
+05:00 - Install Backend Dependencies
+10:00 - Install Frontend Dependencies
+18:00 - Verify Installation
+20:00 - Next Steps Preview
+21:00 - Outro
+
+🛠️ TECH STACK:
+- Laravel 12
+- Inertia.js 2.0
+- React 19
+- TypeScript 5.7
+- Tailwind CSS 4.0
+- Radix UI (shadcn/ui)
+- Laravel Fortify & Sanctum
+- Laravel Reverb
+- Pusher
+
+📦 PACKAGES INSTALLED:
+Backend:
+- inertiajs/inertia-laravel
+- laravel/fortify
+- laravel/sanctum
+- laravel/reverb
+- pusher/pusher-php-server
+- laravel/wayfinder
+- pestphp/pest (testing)
+- laravel/pint (formatter)
+- laravel/pail (logs)
+
+Frontend:
+- @inertiajs/react
+- react & react-dom
+- typescript
+- tailwindcss
+- @radix-ui/* (UI components)
+- lucide-react (icons)
+- sonner (notifications)
+- next-themes (dark mode)
+- axios, clsx, date-fns, etc.
+
+🔗 LINKS:
+📁 GitHub Repository: [link]
+📚 Documentation: [link]
+💬 Discord Community: [link]
+☕ Support Channel: [link]
+
+🎯 NEXT VIDEO:
+Part 2 - Configuration & Project Structure
+
+#laravel #react #typescript #inertiajs #webdevelopment #tutorial #programming #fullstack #tailwindcss
+```
+
+---
+
+## 💡 TIPS FOR VIDEO PRODUCTION
+
+### Visual Elements:
+1. **Code Highlighting**: Gunakan syntax highlighting yang jelas
+2. **Zoom In**: Ketika explain code, zoom in ke relevant parts
+3. **Annotations**: Gunakan arrows dan highlights untuk point things out
+4. **Terminal**: Gunakan terminal theme yang readable (contoh: Oh My Zsh dengan powerlevel10k)
+5. **Split Screen**: Show code dan browser side by side
+
+### Audio:
+1. Pakai mic yang jernih
+2. Remove background noise
+3. Background music volume 10-15% dari voice
+4. Gunakan sound effects untuk transitions (subtle)
+
+### Pacing:
+1. Jangan terlalu cepat, especially untuk complex parts
+2. Pause setelah explain important concepts
+3. Repeat important commands
+4. Show hasil dari setiap step
+
+### Engagement:
+1. Ask viewers to comment jika ada error
+2. Encourage untuk share error messages
+3. Remind untuk subscribe di middle video (selain di opening/closing)
+4. Respond to comments untuk build community
+
+---
+
+## 📋 CHECKLIST BEFORE RECORDING
+
+- [ ] Test semua commands di fresh environment
+- [ ] Prepare GitHub repository
+- [ ] Setup recording environment (clean desktop, good lighting)
+- [ ] Test audio levels
+- [ ] Prepare VSCode theme & terminal theme
+- [ ] Close unnecessary applications
+- [ ] Prepare error handling explanations
+- [ ] Create thumbnail design
+- [ ] Write timestamps after recording
+
+---
+
+**Good luck dengan tutorial series! 🚀**
+**Return success; 😉**

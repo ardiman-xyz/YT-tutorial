@@ -59,6 +59,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/profile/{user}', [ProfileController::class, 'show'])->name('profile.show');
     Route::get('/profile/{user}/likes', [ProfileController::class, 'likes'])->name('profile.likes');
     Route::get('/profile/{user}/media', [ProfileController::class, 'media'])->name('profile.media');
+
+    Route::get('/notifications/unread-count', [NotificationController::class, 'getUnreadCount'])->name('notifications.unread-count');
+    Route::post('/notifications/mark-all-read', [NotificationController::class, 'markAllAsRead'])->name('notifications.mark-all-read');
 });
 
 require __DIR__.'/settings.php';

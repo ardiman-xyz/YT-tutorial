@@ -1,27 +1,43 @@
+// resources/js/layouts/partials/NavItem.tsx
+
+import { cn } from '@/lib/utils';
 import { Link } from '@inertiajs/react';
-import React from 'react';
+import { ReactNode } from 'react';
+
+interface NavItemProps {
+    href: string;
+    active: boolean;
+    icon: ReactNode;
+    children: ReactNode;
+    onClick?: () => void;
+}
 
 export default function NavItem({
     href,
-    icon,
     active,
+    icon,
     children,
-}: {
-    href: string;
-    icon: React.ReactNode;
-    active?: boolean;
-    children: React.ReactNode;
-}) {
+    onClick,
+}: NavItemProps) {
+    const handleClick = (e: React.MouseEvent) => {
+        if (onClick) {
+            e.preventDefault();
+            onClick();
+        }
+    };
+
     return (
         <Link
             href={href}
-            className={`flex items-center gap-4 rounded-full px-4 py-2 text-lg font-medium transition ${
+            onClick={handleClick}
+            className={cn(
+                'flex items-center gap-4 rounded-full px-4 py-3 text-xl transition-colors',
                 active
-                    ? 'text-blue-500'
-                    : 'text-gray-800 hover:bg-gray-100 hover:text-blue-500'
-            }`}
+                    ? 'bg-primary/10 font-bold'
+                    : 'font-normal hover:bg-muted',
+            )}
         >
-            <span className="h-6 w-6">{icon}</span>
+            {icon}
             <span>{children}</span>
         </Link>
     );

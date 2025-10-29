@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Notification;
 use Illuminate\Http\Request;
 
 class NotificationController extends Controller
@@ -15,7 +16,10 @@ class NotificationController extends Controller
 
         // TODO: Get real notifications from database
         // For now, return mock data for UI testing
-        $notifications = $this->getMockNotifications();
+         $notifications = Notification::with(['user', 'actor', 'post'])
+                        ->latest()
+                        ->get()
+                        ->toArray();
 
         return inertia('notifications/index', [
             'notifications' => [
@@ -34,12 +38,25 @@ class NotificationController extends Controller
         ]);
     }
 
-    /**
-     * Mark notification as read.
-     */
+    public function getUnreadCount()
+    {
+        $count = auth()->user()->notifications()
+            ->where('is_read', false)
+            ->count();
+        
+        return response()->json(['count' => $count]);
+    }
+
     public function markAsRead($id)
     {
-        // TODO: Implement mark as read
+        $notification = Notification::where('id', $id)
+            ->where('user_id', auth()->id())
+            ->first();
+        
+        if ($notification) {
+            $notification->update(['is_read' => true]);
+        }
+        
         return response()->json(['success' => true]);
     }
 
@@ -51,6 +68,8 @@ class NotificationController extends Controller
         // TODO: Implement mark all as read
         return response()->json(['success' => true]);
     }
+
+    
 
     /**
      * Get mock notifications for UI testing.
