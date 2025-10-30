@@ -14,17 +14,19 @@ class NotificationController extends Controller
     {
         $currentUser = auth()->user();
 
-        // TODO: Get real notifications from database
-        // For now, return mock data for UI testing
-         $notifications = Notification::with(['user', 'actor', 'post'])
-                        ->latest()
-                        ->get()
-                        ->toArray();
+        // Get real notifications from database
+        // Exclude notifications where user is the actor (self-notifications)
+        $notifications = Notification::with(['actor', 'post'])
+            ->where('user_id', $currentUser->id)
+            ->where('actor_id', '!=', $currentUser->id) // Exclude self-notifications
+            ->latest()
+            ->get()
+            ->toArray();
 
         return inertia('notifications/index', [
             'notifications' => [
                 'all' => $notifications,
-                'verified' => array_filter($notifications, fn($n) => $n['user']['is_verified']),
+                'verified' => array_filter($notifications, fn($n) => $n['actor']['is_verified'] ?? false),
                 'mentions' => array_filter($notifications, fn($n) => $n['type'] === 'mention'),
             ],
             'auth' => [
@@ -61,152 +63,32 @@ class NotificationController extends Controller
     }
 
     /**
-     * Mark all notifications as read.
-     */
+        * Mark all notifications as read.
+    */
     public function markAllAsRead()
     {
-        // TODO: Implement mark all as read
-        return response()->json(['success' => true]);
-    }
+        try {
+            $currentUser = auth()->user();
+            
+            // Update all unread notifications for current user
+            $updatedCount = $currentUser->notifications()
+                ->where('is_read', false)
+                ->update(['is_read' => true]);
 
+            return response()->json([
+                'success' => true,
+                'message' => 'All notifications marked as read',
+                'updated_count' => $updatedCount,
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to mark notifications as read',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
     
 
-    /**
-     * Get mock notifications for UI testing.
-     */
-    private function getMockNotifications()
-    {
-        return [
-            [
-                'id' => 1,
-                'type' => 'like',
-                'user' => [
-                    'id' => 2,
-                    'name' => 'John Doe',
-                    'username' => 'johndoe',
-                    'avatar' => 'https://api.dicebear.com/7.x/avataaars/svg?seed=John',
-                    'is_verified' => true,
-                ],
-                'post' => [
-                    'id' => 1,
-                    'content' => 'Just launched my new project! Check it out 🚀',
-                ],
-                'created_at' => now()->subMinutes(5)->toISOString(),
-                'read_at' => null,
-            ],
-            [
-                'id' => 2,
-                'type' => 'follow',
-                'user' => [
-                    'id' => 3,
-                    'name' => 'Jane Smith',
-                    'username' => 'janesmith',
-                    'avatar' => 'https://api.dicebear.com/7.x/avataaars/svg?seed=Jane',
-                    'is_verified' => false,
-                ],
-                'post' => null,
-                'created_at' => now()->subHour()->toISOString(),
-                'read_at' => null,
-            ],
-            [
-                'id' => 3,
-                'type' => 'reply',
-                'user' => [
-                    'id' => 4,
-                    'name' => 'Mike Johnson',
-                    'username' => 'mikej',
-                    'avatar' => 'https://api.dicebear.com/7.x/avataaars/svg?seed=Mike',
-                    'is_verified' => true,
-                ],
-                'post' => [
-                    'id' => 2,
-                    'content' => 'What do you think about the new Laravel features?',
-                ],
-                'created_at' => now()->subHours(3)->toISOString(),
-                'read_at' => null,
-            ],
-            [
-                'id' => 4,
-                'type' => 'repost',
-                'user' => [
-                    'id' => 5,
-                    'name' => 'Sarah Williams',
-                    'username' => 'sarahw',
-                    'avatar' => 'https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah',
-                    'is_verified' => false,
-                ],
-                'post' => [
-                    'id' => 3,
-                    'content' => 'React Server Components are game changers! 🎮',
-                ],
-                'created_at' => now()->subHours(5)->toISOString(),
-                'read_at' => now()->subHours(4)->toISOString(),
-            ],
-            [
-                'id' => 5,
-                'type' => 'mention',
-                'user' => [
-                    'id' => 6,
-                    'name' => 'Alex Brown',
-                    'username' => 'alexb',
-                    'avatar' => 'https://api.dicebear.com/7.x/avataaars/svg?seed=Alex',
-                    'is_verified' => true,
-                ],
-                'post' => [
-                    'id' => 4,
-                    'content' => '@you Great work on the animation tutorial!',
-                ],
-                'created_at' => now()->subDay()->toISOString(),
-                'read_at' => null,
-            ],
-            [
-                'id' => 6,
-                'type' => 'like',
-                'user' => [
-                    'id' => 7,
-                    'name' => 'Emily Davis',
-                    'username' => 'emilyd',
-                    'avatar' => 'https://api.dicebear.com/7.x/avataaars/svg?seed=Emily',
-                    'is_verified' => false,
-                ],
-                'post' => [
-                    'id' => 5,
-                    'content' => 'Building a Twitter clone with Laravel + React! Day 5 progress 💪',
-                ],
-                'created_at' => now()->subDays(2)->toISOString(),
-                'read_at' => now()->subDay()->toISOString(),
-            ],
-            [
-                'id' => 7,
-                'type' => 'follow',
-                'user' => [
-                    'id' => 8,
-                    'name' => 'Chris Wilson',
-                    'username' => 'chrisw',
-                    'avatar' => 'https://api.dicebear.com/7.x/avataaars/svg?seed=Chris',
-                    'is_verified' => true,
-                ],
-                'post' => null,
-                'created_at' => now()->subDays(3)->toISOString(),
-                'read_at' => now()->subDays(2)->toISOString(),
-            ],
-            [
-                'id' => 8,
-                'type' => 'reply',
-                'user' => [
-                    'id' => 9,
-                    'name' => 'Lisa Anderson',
-                    'username' => 'lisaa',
-                    'avatar' => 'https://api.dicebear.com/7.x/avataaars/svg?seed=Lisa',
-                    'is_verified' => false,
-                ],
-                'post' => [
-                    'id' => 6,
-                    'content' => 'Anyone using Tailwind CSS v4 yet?',
-                ],
-                'created_at' => now()->subDays(4)->toISOString(),
-                'read_at' => now()->subDays(3)->toISOString(),
-            ],
-        ];
-    }
 }

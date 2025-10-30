@@ -39,6 +39,7 @@ interface PostProps {
     isFollowing?: boolean;
     onFollow?: (e?: React.MouseEvent) => void;
     onDelete?: () => void;
+    bookmarks?: number;
 }
 
 export function Post(props: PostProps) {
@@ -62,6 +63,7 @@ export function Post(props: PostProps) {
         onShare,
         onDelete,
         onFollow,
+        bookmarks = 0,
     } = props;
 
     const handleAction = (
@@ -97,6 +99,7 @@ export function Post(props: PostProps) {
             <div onClick={(e) => e.stopPropagation()}>
                 <PostActions
                     replies={replies}
+                    bookmarks={bookmarks}
                     likes={likes}
                     reposts={reposts}
                     views={views}

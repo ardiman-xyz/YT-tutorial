@@ -2,6 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\MessageSent;
+use App\Events\UserTyping;
+use App\Models\Conversation;
+use App\Models\Message;
+use App\Models\User;
 use Illuminate\Http\Request;
 
 class MessagesController extends Controller
@@ -13,8 +18,43 @@ class MessagesController extends Controller
     {
         $currentUser = auth()->user();
 
-        // TODO: Get real conversations from database
-        $conversations = $this->getMockConversations();
+        // Get user's conversations
+        $userConversations = $currentUser->conversations()
+            ->latest('updated_at')
+            ->get();
+
+        // Map conversations with details
+        $conversations = $userConversations->map(function($conversation) use ($currentUser) {
+            $otherUser = $conversation->getOtherParticipant($currentUser);
+            
+            if (!$otherUser) {
+                return null;
+            }
+
+            $lastMessage = $conversation->messages()
+                ->orderBy('created_at', 'desc')
+                ->first();
+            
+            $unreadCount = $conversation->getUnreadCountFor($currentUser);
+            
+            return [
+                'id' => $conversation->id,
+                'user' => [
+                    'id' => $otherUser->id,
+                    'name' => $otherUser->name,
+                    'username' => $otherUser->username,
+                    'avatar' => $otherUser->avatar,
+                    'is_verified' => $otherUser->is_verified,
+                    'is_online' => false,
+                ],
+                'last_message' => $lastMessage ? [
+                    'content' => $lastMessage->content,
+                    'created_at' => $lastMessage->created_at->toISOString(),
+                    'is_read' => $lastMessage->sender_id === $currentUser->id || $lastMessage->is_read,
+                ] : null,
+                'unread_count' => $unreadCount,
+            ];
+        })->filter()->values();
 
         return inertia('messages/index', [
             'conversations' => $conversations,
@@ -32,26 +72,247 @@ class MessagesController extends Controller
     }
 
     /**
+     * Show new conversation form.
+     */
+    public function create()
+    {
+        $currentUser = auth()->user();
+
+        // Get users that current user is following or followers (excluding self and existing conversations)
+        $existingConversationUserIds = $currentUser->conversations()
+            ->get()
+            ->map(function($conversation) use ($currentUser) {
+                $otherUser = $conversation->getOtherParticipant($currentUser);
+                return $otherUser ? $otherUser->id : null;
+            })
+            ->filter()
+            ->toArray();
+
+        // Get potential users to message
+        $suggestedUsers = User::where('id', '!=', $currentUser->id)
+            ->whereNotIn('id', $existingConversationUserIds)
+            ->where(function($query) use ($currentUser) {
+                // Following or followers
+                $query->whereHas('followers', function($q) use ($currentUser) {
+                    $q->where('follower_id', $currentUser->id);
+                })
+                ->orWhereHas('following', function($q) use ($currentUser) {
+                    $q->where('following_id', $currentUser->id);
+                });
+            })
+            ->limit(20)
+            ->get()
+            ->map(function($user) use ($currentUser) {
+                return [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'username' => $user->username,
+                    'avatar' => $user->avatar,
+                    'is_verified' => $user->is_verified,
+                    'is_following' => $currentUser->following()
+                        ->where('following_id', $user->id)
+                        ->exists(),
+                ];
+            });
+
+        return inertia('messages/new', [
+            'suggested_users' => $suggestedUsers,
+            'auth' => [
+                'user' => [
+                    'id' => $currentUser->id,
+                    'name' => $currentUser->name,
+                    'username' => $currentUser->username,
+                    'avatar' => $currentUser->avatar,
+                ],
+            ],
+        ]);
+    }
+
+    /**
+     * Create new conversation and send first message.
+     */
+    public function createConversation(Request $request)
+    {
+        $validated = $request->validate([
+            'recipient_id' => 'required|exists:users,id',
+            'message' => 'required|string|max:1000',
+        ]);
+
+        $currentUser = auth()->user();
+
+        // Check if user is trying to message themselves
+        if ($validated['recipient_id'] == $currentUser->id) {
+            return back()->withErrors(['recipient_id' => 'You cannot message yourself.']);
+        }
+
+        // Check if conversation already exists
+        $existingConversation = Conversation::whereHas('participants', function($query) use ($currentUser) {
+            $query->where('user_id', $currentUser->id);
+        })
+        ->whereHas('participants', function($query) use ($validated) {
+            $query->where('user_id', $validated['recipient_id']);
+        })
+        ->first();
+
+        if ($existingConversation) {
+            // Conversation exists, redirect to it
+            return redirect()->route('messages.show', $existingConversation->id);
+        }
+
+        // Create new conversation
+        $conversation = Conversation::create([]);
+
+        // Add participants
+        $conversation->participants()->attach([
+            $currentUser->id,
+            $validated['recipient_id'],
+        ]);
+
+        // Create first message
+        $message = Message::create([
+            'conversation_id' => $conversation->id,
+            'sender_id' => $currentUser->id,
+            'content' => $validated['message'],
+        ]);
+
+        // Broadcast event
+        broadcast(new MessageSent($message, $currentUser))->toOthers();
+
+        return redirect()->route('messages.show', $conversation->id);
+    }
+
+    /**
+     * Search users to start conversation.
+     */
+    public function searchUsers(Request $request)
+    {
+        $query = $request->input('q', '');
+        $currentUser = auth()->user();
+
+        if (empty($query)) {
+            return response()->json(['users' => []]);
+        }
+
+        // Get existing conversation user IDs
+        $existingConversationUserIds = $currentUser->conversations()
+            ->get()
+            ->map(function($conversation) use ($currentUser) {
+                $otherUser = $conversation->getOtherParticipant($currentUser);
+                return $otherUser ? $otherUser->id : null;
+            })
+            ->filter()
+            ->toArray();
+
+        // Search users
+        $users = User::where('id', '!=', $currentUser->id)
+            ->whereNotIn('id', $existingConversationUserIds)
+            ->where(function($q) use ($query) {
+                $q->where('name', 'like', "%{$query}%")
+                  ->orWhere('username', 'like', "%{$query}%");
+            })
+            ->limit(10)
+            ->get()
+            ->map(function($user) use ($currentUser) {
+                return [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'username' => $user->username,
+                    'avatar' => $user->avatar,
+                    'is_verified' => $user->is_verified,
+                    'is_following' => $currentUser->following()
+                        ->where('following_id', $user->id)
+                        ->exists(),
+                ];
+            });
+
+        return response()->json(['users' => $users]);
+    }
+
+    /**
      * Show specific conversation.
      */
     public function show($conversationId)
     {
         $currentUser = auth()->user();
-
-        // TODO: Get real conversation from database
-        $conversations = $this->getMockConversations();
-        $activeConversation = collect($conversations)->firstWhere('id', (int) $conversationId);
         
-        if (!$activeConversation) {
+        $conversation = Conversation::findOrFail($conversationId);
+
+        // Check if user is participant
+        if (!$conversation->hasParticipant($currentUser)) {
+            abort(403, 'Unauthorized');
+        }
+
+        // Get all conversations for sidebar
+        $userConversations = $currentUser->conversations()
+            ->latest('updated_at')
+            ->get();
+
+        $conversations = $userConversations->map(function($conv) use ($currentUser) {
+            $otherUser = $conv->getOtherParticipant($currentUser);
+            
+            if (!$otherUser) {
+                return null;
+            }
+
+            $lastMessage = $conv->messages()
+                ->orderBy('created_at', 'asc')
+                ->first();
+            
+            return [
+                'id' => $conv->id,
+                'user' => [
+                    'id' => $otherUser->id,
+                    'name' => $otherUser->name,
+                    'username' => $otherUser->username,
+                    'avatar' => $otherUser->avatar,
+                    'is_verified' => $otherUser->is_verified,
+                    'is_online' => false,
+                ],
+                'last_message' => $lastMessage ? [
+                    'content' => $lastMessage->content,
+                    'created_at' => $lastMessage->created_at->toISOString(),
+                    'is_read' => $lastMessage->sender_id === $currentUser->id || $lastMessage->is_read,
+                ] : null,
+                'unread_count' => $conv->getUnreadCountFor($currentUser),
+            ];
+        })->filter()->values();
+
+        // Get messages
+        $messages = $conversation->messages()
+            ->orderBy('created_at', 'asc')
+            ->get()
+            ->map(function($message) {
+                return [
+                    'id' => $message->id,
+                    'content' => $message->content,
+                    'sender_id' => $message->sender_id,
+                    'created_at' => $message->created_at->toISOString(),
+                ];
+            });
+
+        // Mark as read
+        $conversation->markAsReadFor($currentUser);
+
+        // Get other user
+        $otherUser = $conversation->getOtherParticipant($currentUser);
+
+        if (!$otherUser) {
             return redirect()->route('messages.index');
         }
 
-        // TODO: Get real messages from database
-        $messages = $this->getMockMessages((int) $conversationId);
-
         return inertia('messages/index', [
             'conversations' => $conversations,
-            'active_conversation' => $activeConversation,
+            'active_conversation' => [
+                'id' => $conversation->id,
+                'user' => [
+                    'id' => $otherUser->id,
+                    'name' => $otherUser->name,
+                    'username' => $otherUser->username,
+                    'avatar' => $otherUser->avatar,
+                    'is_verified' => $otherUser->is_verified,
+                    'is_online' => false,
+                ],
+            ],
             'messages' => $messages,
             'auth' => [
                 'user' => [
@@ -70,206 +331,68 @@ class MessagesController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'conversation_id' => 'required|integer',
+            'conversation_id' => 'required|integer|exists:conversations,id',
             'content' => 'required|string|max:1000',
         ]);
 
-        // TODO: Store message in database
-        // TODO: Broadcast message via Reverb
+        $currentUser = auth()->user();
+        
+        // Check if user is participant
+        $conversation = Conversation::findOrFail($validated['conversation_id']);
+        if (!$conversation->hasParticipant($currentUser)) {
+            abort(403, 'Unauthorized');
+        }
+
+        // Create message
+        $message = Message::create([
+            'conversation_id' => $validated['conversation_id'],
+            'sender_id' => $currentUser->id,
+            'content' => $validated['content'],
+        ]);
+
+        // Update conversation timestamp
+        $conversation->touch();
+
+        // Broadcast event
+        broadcast(new MessageSent($message, $currentUser))->toOthers();
 
         return response()->json([
             'success' => true,
             'message' => [
-                'id' => rand(1000, 9999),
-                'content' => $validated['content'],
-                'sender_id' => auth()->id(),
-                'created_at' => now()->toISOString(),
+                'id' => $message->id,
+                'content' => $message->content,
+                'sender_id' => $message->sender_id,
+                'conversation_id' => $message->conversation_id,
+                'created_at' => $message->created_at->toISOString(),
             ],
         ]);
     }
 
     /**
-     * Get mock conversations for UI testing.
+     * Broadcast typing indicator.
      */
-    private function getMockConversations()
+    public function typing(Request $request)
     {
-        return [
-            [
-                'id' => 1,
-                'user' => [
-                    'id' => 2,
-                    'name' => 'John Doe',
-                    'username' => 'johndoe',
-                    'avatar' => 'https://api.dicebear.com/7.x/avataaars/svg?seed=John',
-                    'is_verified' => true,
-                    'is_online' => true,
-                ],
-                'last_message' => [
-                    'content' => 'Hey! How are you doing?',
-                    'created_at' => now()->subMinutes(5)->toISOString(),
-                    'is_read' => false,
-                ],
-                'unread_count' => 2,
-            ],
-            [
-                'id' => 2,
-                'user' => [
-                    'id' => 3,
-                    'name' => 'Jane Smith',
-                    'username' => 'janesmith',
-                    'avatar' => 'https://api.dicebear.com/7.x/avataaars/svg?seed=Jane',
-                    'is_verified' => false,
-                    'is_online' => true,
-                ],
-                'last_message' => [
-                    'content' => 'Thanks for the help yesterday!',
-                    'created_at' => now()->subHour()->toISOString(),
-                    'is_read' => true,
-                ],
-                'unread_count' => 0,
-            ],
-            [
-                'id' => 3,
-                'user' => [
-                    'id' => 4,
-                    'name' => 'Mike Johnson',
-                    'username' => 'mikej',
-                    'avatar' => 'https://api.dicebear.com/7.x/avataaars/svg?seed=Mike',
-                    'is_verified' => true,
-                    'is_online' => false,
-                ],
-                'last_message' => [
-                    'content' => 'Did you see the new Laravel release?',
-                    'created_at' => now()->subHours(3)->toISOString(),
-                    'is_read' => true,
-                ],
-                'unread_count' => 0,
-            ],
-            [
-                'id' => 4,
-                'user' => [
-                    'id' => 5,
-                    'name' => 'Sarah Williams',
-                    'username' => 'sarahw',
-                    'avatar' => 'https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah',
-                    'is_verified' => false,
-                    'is_online' => false,
-                ],
-                'last_message' => [
-                    'content' => 'Let me know when you\'re free to chat',
-                    'created_at' => now()->subDays(1)->toISOString(),
-                    'is_read' => true,
-                ],
-                'unread_count' => 0,
-            ],
-            [
-                'id' => 5,
-                'user' => [
-                    'id' => 6,
-                    'name' => 'Alex Brown',
-                    'username' => 'alexb',
-                    'avatar' => 'https://api.dicebear.com/7.x/avataaars/svg?seed=Alex',
-                    'is_verified' => true,
-                    'is_online' => true,
-                ],
-                'last_message' => [
-                    'content' => 'Perfect! See you tomorrow',
-                    'created_at' => now()->subDays(2)->toISOString(),
-                    'is_read' => true,
-                ],
-                'unread_count' => 0,
-            ],
-        ];
-    }
+        $validated = $request->validate([
+            'conversation_id' => 'required|integer|exists:conversations,id',
+            'is_typing' => 'required|boolean',
+        ]);
 
-    /**
-     * Get mock messages for a conversation.
-     */
-    private function getMockMessages($conversationId)
-    {
-        $currentUserId = auth()->id();
+        $currentUser = auth()->user();
+        
+        // Check if user is participant
+        $conversation = Conversation::findOrFail($validated['conversation_id']);
+        if (!$conversation->hasParticipant($currentUser)) {
+            abort(403, 'Unauthorized');
+        }
 
-        $messagesMap = [
-            1 => [
-                [
-                    'id' => 1,
-                    'content' => 'Hey! How are you doing?',
-                    'sender_id' => 2,
-                    'created_at' => now()->subHours(2)->toISOString(),
-                ],
-                [
-                    'id' => 2,
-                    'content' => 'I\'m doing great! Just working on the new project',
-                    'sender_id' => $currentUserId,
-                    'created_at' => now()->subHours(2)->addMinutes(5)->toISOString(),
-                ],
-                [
-                    'id' => 3,
-                    'content' => 'That sounds exciting! What are you building?',
-                    'sender_id' => 2,
-                    'created_at' => now()->subHours(1)->toISOString(),
-                ],
-                [
-                    'id' => 4,
-                    'content' => 'A Twitter clone with Laravel and React. It\'s coming along nicely!',
-                    'sender_id' => $currentUserId,
-                    'created_at' => now()->subHours(1)->addMinutes(2)->toISOString(),
-                ],
-                [
-                    'id' => 5,
-                    'content' => 'Wow! Can\'t wait to see it. Let me know if you need any help',
-                    'sender_id' => 2,
-                    'created_at' => now()->subMinutes(5)->toISOString(),
-                ],
-            ],
-            2 => [
-                [
-                    'id' => 6,
-                    'content' => 'Hey, do you have a minute?',
-                    'sender_id' => 3,
-                    'created_at' => now()->subHours(5)->toISOString(),
-                ],
-                [
-                    'id' => 7,
-                    'content' => 'Sure! What\'s up?',
-                    'sender_id' => $currentUserId,
-                    'created_at' => now()->subHours(5)->addMinutes(3)->toISOString(),
-                ],
-                [
-                    'id' => 8,
-                    'content' => 'I was wondering if you could help me with that React issue',
-                    'sender_id' => 3,
-                    'created_at' => now()->subHours(4)->toISOString(),
-                ],
-                [
-                    'id' => 9,
-                    'content' => 'Of course! Send me the code and I\'ll take a look',
-                    'sender_id' => $currentUserId,
-                    'created_at' => now()->subHours(4)->addMinutes(1)->toISOString(),
-                ],
-                [
-                    'id' => 10,
-                    'content' => 'Thanks for the help yesterday!',
-                    'sender_id' => 3,
-                    'created_at' => now()->subHour()->toISOString(),
-                ],
-            ],
-            3 => [
-                [
-                    'id' => 11,
-                    'content' => 'Did you see the new Laravel release?',
-                    'sender_id' => 4,
-                    'created_at' => now()->subHours(3)->toISOString(),
-                ],
-                [
-                    'id' => 12,
-                    'content' => 'Yes! The new features look amazing',
-                    'sender_id' => $currentUserId,
-                    'created_at' => now()->subHours(3)->addMinutes(10)->toISOString(),
-                ],
-            ],
-        ];
+        // Broadcast typing event
+        // broadcast(new UserTyping(
+        //     $currentUser,
+        //     $validated['conversation_id'],
+        //     $validated['is_typing']
+        // ))->toOthers();
 
-        return $messagesMap[$conversationId] ?? [];
+        return response()->json(['success' => true]);
     }
 }

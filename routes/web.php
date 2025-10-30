@@ -30,9 +30,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/notifications/{id}/read', [NotificationController::class, 'markAsRead'])->name('notifications.read');
     Route::post('/notifications/read-all', [NotificationController::class, 'markAllAsRead'])->name('notifications.read-all');
 
-    Route::get('/messages', [MessagesController::class, 'index'])->name('messages.index');
-    Route::get('/messages/{id}', [MessagesController::class, 'show'])->name('messages.show');
-    Route::post('/messages', [MessagesController::class, 'store'])->name('messages.store');
+   
 
     Route::get('/explore', [ExploreController::class, 'index'])->name('explore.index');
     Route::get('/search', [ExploreController::class, 'search'])->name('explore.search');
@@ -62,6 +60,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('/notifications/unread-count', [NotificationController::class, 'getUnreadCount'])->name('notifications.unread-count');
     Route::post('/notifications/mark-all-read', [NotificationController::class, 'markAllAsRead'])->name('notifications.mark-all-read');
+
+
+     Route::get('/messages', [MessagesController::class, 'index'])->name('messages.index');
+    Route::get('/messages/new', [MessagesController::class, 'create'])->name('messages.new');
+    Route::post('/messages/conversation', [MessagesController::class, 'createConversation'])->name('messages.conversation.create');
+    Route::get('/messages/search-users', [MessagesController::class, 'searchUsers'])->name('messages.search-users');
+    Route::get('/messages/{id}', [MessagesController::class, 'show'])->name('messages.show');
+    Route::post('/messages', [MessagesController::class, 'store'])->name('messages.store');
+    Route::post('/messages/typing', [MessagesController::class, 'typing'])->name('messages.typing');
 });
 
 require __DIR__.'/settings.php';

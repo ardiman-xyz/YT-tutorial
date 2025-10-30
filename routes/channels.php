@@ -17,3 +17,11 @@ Broadcast::channel('test', function ($user) {
 Broadcast::channel('orders', function () {
     return true; 
 });
+
+Broadcast::channel('conversation.{conversationId}', function ($user, $conversationId) {
+    // Check if user is participant of this conversation
+    return \App\Models\Conversation::find($conversationId)
+        ->participants()
+        ->where('user_id', $user->id)
+        ->exists();
+});

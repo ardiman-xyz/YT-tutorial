@@ -27,6 +27,7 @@ interface PostActionsProps {
     onReply: (e?: React.MouseEvent) => void;
     onBookmark: (e?: React.MouseEvent) => void;
     onShare: (e?: React.MouseEvent) => void;
+    bookmarks: number;
 }
 
 export function PostActions({
@@ -42,6 +43,7 @@ export function PostActions({
     onReply,
     onBookmark,
     onShare,
+    bookmarks,
 }: PostActionsProps) {
     const handleClick = (
         callback: (e?: React.MouseEvent) => void,
@@ -108,11 +110,17 @@ export function PostActions({
                 <div className="flex items-center">
                     <Tooltip>
                         <TooltipTrigger asChild>
-                            <div>
+                            <div className="mr-2 flex items-center">
                                 <BookmarkButton
                                     isBookmarked={isBookmarked}
                                     onClick={(e) => handleClick(onBookmark, e)}
                                 />
+                                {/* Tampilkan jumlah bookmark */}
+                                {bookmarks > 0 && (
+                                    <span className="-ml-2 text-xs text-muted-foreground">
+                                        {formatNumber(bookmarks)}
+                                    </span>
+                                )}
                             </div>
                         </TooltipTrigger>
                         <TooltipContent>Bookmark</TooltipContent>

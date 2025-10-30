@@ -1,5 +1,3 @@
-// resources/js/layouts/partials/LeftSidebar.tsx
-
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
     DropdownMenu,

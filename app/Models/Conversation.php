@@ -4,7 +4,6 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -19,18 +18,18 @@ class Conversation extends Model
      */
     protected $fillable = [];
 
-    // Participants relationship
+    // Participants relationship (tanpa role)
     public function participants(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'conversation_participants')
-            ->withPivot('last_read_at', 'role')
+            ->withPivot('last_read_at')
             ->withTimestamps();
     }
 
     // Messages relationship
     public function messages(): HasMany
     {
-        return $this->hasMany(Message::class)->orderBy('created_at', 'desc');
+        return $this->hasMany(Message::class)->orderBy('created_at', 'asc');
     }
 
     // Get latest message
@@ -45,7 +44,7 @@ class Conversation extends Model
         return $this->participants()->where('user_id', $user->id)->exists();
     }
 
-    // Get other participant (untuk 1-on-1 chat)
+    // Get other participant (for 1-on-1 chat)
     public function getOtherParticipant(User $currentUser): ?User
     {
         return $this->participants()
@@ -64,14 +63,20 @@ class Conversation extends Model
     // Get unread count for user
     public function getUnreadCountFor(User $user): int
     {
-        $lastReadAt = $this->participants()
+        $participant = $this->participants()
             ->where('user_id', $user->id)
-            ->first()
-            ->pivot
-            ->last_read_at;
+            ->first();
+
+        if (!$participant) {
+            return 0;
+        }
+
+        $lastReadAt = $participant->pivot->last_read_at;
 
         if (!$lastReadAt) {
-            return $this->messages()->count();
+            return $this->messages()
+                ->where('sender_id', '!=', $user->id)
+                ->count();
         }
 
         return $this->messages()

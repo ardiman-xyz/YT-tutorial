@@ -227,6 +227,7 @@ export default function Dashboard() {
                                 reposts={post.reposts_count || 0}
                                 views={0}
                                 isLiked={post.is_liked || false}
+                                bookmarks={post.bookmarks_count || 0}
                                 isReposted={post.is_reposted || false}
                                 isBookmarked={post.is_bookmarked || false}
                                 onLike={(e) => handleLike(post.id, e)}

@@ -26,7 +26,7 @@ class PostController extends Controller
                 'user:id,name,username,avatar,is_verified',
                 'media:id,post_id,type,url,thumbnail_url,duration',
             ])
-            ->withCount(['likes', 'reposts', 'replies'])
+            ->withCount(['likes', 'reposts', 'replies', 'bookmarks'])
             ->latest()
             ->get()
             ->map(function ($post) use ($user) {

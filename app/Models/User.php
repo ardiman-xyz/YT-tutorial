@@ -134,10 +134,10 @@ class User extends Authenticatable
     }
 
     // Conversations
-    public function conversations(): BelongsToMany
+   public function conversations(): BelongsToMany
     {
         return $this->belongsToMany(Conversation::class, 'conversation_participants')
-            ->withPivot('last_read_at', 'role')
+            ->withPivot('last_read_at') // Hapus 'role'
             ->withTimestamps();
     }
 
