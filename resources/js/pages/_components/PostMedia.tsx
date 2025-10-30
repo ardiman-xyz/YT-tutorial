@@ -1,15 +1,12 @@
 import { cn } from '@/lib/utils';
-import { Play } from 'lucide-react';
+import { VideoPlayer } from './VideoPlayer';
+import { PostMedia } from './type';
 
-interface PostMedia {
-    id: number;
-    url: string;
-    type: 'image' | 'video' | 'gif';
-    thumbnail?: string;
-    duration?: string;
+interface PostMediaGridProps {
+    media: PostMedia[];
 }
 
-export function PostMediaGrid({ media }: { media: PostMedia[] }) {
+export function PostMediaGrid({ media }: PostMediaGridProps) {
     if (!media.length) return null;
 
     return (
@@ -30,30 +27,18 @@ export function PostMediaGrid({ media }: { media: PostMedia[] }) {
                         media.length === 3 && index === 0 && 'row-span-2',
                     )}
                 >
-                    {item.type === 'image' ? (
+                    {item.type === 'video' ? (
+                        <VideoPlayer
+                            url={item.url}
+                            thumbnail={item.thumbnail || item.thumbnail_url}
+                            duration={item.duration}
+                        />
+                    ) : (
                         <img
                             src={item.url}
                             alt=""
                             className="h-full w-full object-cover"
                         />
-                    ) : (
-                        <div className="relative h-full w-full">
-                            <img
-                                src={item.thumbnail || item.url}
-                                alt=""
-                                className="h-full w-full object-cover"
-                            />
-                            <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-                                <div className="rounded-full bg-black/70 p-3">
-                                    <Play className="h-6 w-6 fill-white text-white" />
-                                </div>
-                            </div>
-                            {item.duration && (
-                                <div className="absolute bottom-2 left-2 rounded bg-black/70 px-1.5 py-0.5 text-xs text-white">
-                                    {item.duration}
-                                </div>
-                            )}
-                        </div>
                     )}
                 </div>
             ))}

@@ -243,6 +243,7 @@ export default function PostShow() {
                         onReply={handleReplyClick}
                         onBookmark={handleBookmark}
                         onShare={() => {}}
+                        bookmarks={post.bookmarks_count ?? 0}
                     />
 
                     <Separator className="my-3" />

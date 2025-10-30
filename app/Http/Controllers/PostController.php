@@ -3,12 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Events\PostLiked;
+use App\Models\FileUpload;
 use App\Models\Post;
 use App\Models\Hashtag;
 use App\Models\Mention;
 use App\Models\Notification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 class PostController extends Controller
@@ -94,77 +96,164 @@ class PostController extends Controller
         ]);
     }
 
-    /**
-     * Store a newly created post.
-     */
-    public function store(Request $request)
-    {
-        $validated = $request->validate([
-            'content' => 'required_without:images|max:280',
-            'images' => 'nullable|array|max:4',
-            'images.*' => 'image|mimes:jpeg,png,jpg,gif|max:5120',
-            'audience' => 'nullable|in:everyone,circle',
-            'parent_id' => 'nullable|exists:posts,id', // For replies
+   /**
+ * Store a newly created post.
+ */
+public function store(Request $request)
+{
+    // Log incoming request
+    Log::info('📝 Post creation started', [
+        'user_id' => auth()->id(),
+        'has_content' => !empty($request->content),
+        'has_images' => $request->hasFile('images'),
+        'has_video_ids' => $request->has('video_upload_ids'),
+    ]);
+
+    $validated = $request->validate([
+        'content' => 'required_without_all:images,video_upload_ids|max:280',
+        'images' => 'nullable|array|max:4',
+        'images.*' => 'image|mimes:jpeg,png,jpg,gif|max:5120',
+        'video_upload_ids' => 'nullable|json',
+        'audience' => 'nullable|in:everyone,circle',
+        'parent_id' => 'nullable|exists:posts,id', // For replies
+    ]);
+
+    try {
+        DB::beginTransaction();
+
+        // Create post (or reply if parent_id exists)
+        $post = Post::create([
+            'user_id' => auth()->id(),
+            'content' => $validated['content'] ?? '',
+            'parent_id' => $validated['parent_id'] ?? null,
+            'reply_permission' => $validated['audience'] === 'circle' ? 'following' : 'everyone',
         ]);
 
-        try {
-            DB::beginTransaction();
+        Log::info('✅ Post created', ['post_id' => $post->id]);
 
-            // Create post (or reply if parent_id exists)
-            $post = Post::create([
-                'user_id' => auth()->id(),
-                'content' => $validated['content'] ?? '',
-                'parent_id' => $validated['parent_id'] ?? null,
-                'reply_permission' => $validated['audience'] === 'circle' ? 'following' : 'everyone',
+        // Handle image uploads
+        if ($request->hasFile('images')) {
+            Log::info('🖼️ Processing images', ['count' => count($request->file('images'))]);
+            
+            foreach ($request->file('images') as $index => $image) {
+                $path = $image->store('posts/media', 'public');
+                
+                $post->media()->create([
+                    'type' => 'image',
+                    'url' => Storage::url($path),
+                    'order' => $index,
+                ]);
+            }
+        }
+
+        // Handle video uploads from chunked upload
+        if ($request->has('video_upload_ids')) {
+            $videoUploadIds = json_decode($request->video_upload_ids, true);
+            
+            Log::info('🎬 Processing videos', [
+                'post_id' => $post->id,
+                'video_ids' => $videoUploadIds,
             ]);
 
-            // Handle media uploads
-            if ($request->hasFile('images')) {
-                foreach ($request->file('images') as $index => $image) {
-                    $path = $image->store('posts/media', 'public');
-                    
-                    $post->media()->create([
-                        'type' => 'image',
-                        'url' => Storage::url($path),
-                        'order' => $index,
+            foreach ($videoUploadIds as $uploadId) {
+                // Get the completed upload
+                $upload = FileUpload::where('id', $uploadId)
+                    ->where('user_id', auth()->id())
+                    ->where('status', 'completed')
+                    ->first();
+
+                if (!$upload) {
+                    Log::warning('⚠️ Video upload not found', [
+                        'upload_id' => $uploadId,
+                        'post_id' => $post->id,
                     ]);
+                    continue;
                 }
+
+                Log::info('📹 Video found', [
+                    'upload_id' => $upload->id,
+                    'filename' => $upload->original_filename ?? $upload->filename,
+                    'path' => $upload->path,
+                ]);
+
+                // Build URLs from file_uploads.path (single source of truth!)
+                $videoUrl = Storage::url($upload->path);
+                $thumbnailUrl = $upload->thumbnail_path 
+                    ? Storage::url($upload->thumbnail_path) 
+                    : null;
+
+                // Create post media - ONLY store URLs!
+                $media = $post->media()->create([
+                    'type' => 'video',
+                    'url' => $videoUrl,
+                    'thumbnail_url' => $thumbnailUrl,
+                    'order' => 0,
+                ]);
+
+                Log::info('✅ Video linked to post', [
+                    'post_id' => $post->id,
+                    'media_id' => $media->id,
+                    'video_url' => $videoUrl,
+                ]);
+
+                // Optional: Link upload to post
+                $upload->update(['used_in_post_id' => $post->id]);
             }
-
-            // Process hashtags
-            if (!empty($validated['content'])) {
-                $hashtags = Hashtag::findOrCreateFromText($validated['content']);
-                foreach ($hashtags as $hashtag) {
-                    $post->hashtags()->attach($hashtag->id);
-                    $hashtag->incrementPostsCount();
-                }
-            }
-
-            // Process mentions
-            if (!empty($validated['content'])) {
-                $mentionedUsers = Mention::findUsersFromText($validated['content']);
-                foreach ($mentionedUsers as $userData) {
-                    $post->mentions()->create([
-                        'user_id' => $userData['id']
-                    ]);
-                }
-            }
-
-            DB::commit();
-
-            // If reply, redirect back to parent post
-            if ($validated['parent_id'] ?? null) {
-                $parentPost = Post::find($validated['parent_id']);
-                return redirect()->route('posts.show', $parentPost)->with('success', 'Reply posted!');
-            }
-
-            return redirect()->route('dashboard')->with('success', 'Post created successfully!');
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return back()->withErrors(['error' => 'Failed to create post: ' . $e->getMessage()]);
         }
+
+        // Process hashtags
+        if (!empty($validated['content'])) {
+            $hashtags = Hashtag::findOrCreateFromText($validated['content']);
+            foreach ($hashtags as $hashtag) {
+                $post->hashtags()->attach($hashtag->id);
+                $hashtag->incrementPostsCount();
+            }
+            
+            if (count($hashtags) > 0) {
+                Log::info('🏷️ Hashtags processed', ['count' => count($hashtags)]);
+            }
+        }
+
+        // Process mentions
+        if (!empty($validated['content'])) {
+            $mentionedUsers = Mention::findUsersFromText($validated['content']);
+            foreach ($mentionedUsers as $userData) {
+                $post->mentions()->create([
+                    'user_id' => $userData['id']
+                ]);
+            }
+            
+            if (count($mentionedUsers) > 0) {
+                Log::info('👥 Mentions processed', ['count' => count($mentionedUsers)]);
+            }
+        }
+
+        DB::commit();
+
+        Log::info('🎉 Post creation completed', [
+            'post_id' => $post->id,
+            'media_count' => $post->media()->count(),
+        ]);
+
+        // If reply, redirect back to parent post
+        if ($validated['parent_id'] ?? null) {
+            $parentPost = Post::find($validated['parent_id']);
+            return redirect()->route('posts.show', $parentPost)->with('success', 'Reply posted!');
+        }
+
+        return redirect()->route('dashboard')->with('success', 'Post created successfully!');
+
+    } catch (\Exception $e) {
+        DB::rollBack();
+        
+        Log::error('❌ Post creation failed', [
+            'user_id' => auth()->id(),
+            'error' => $e->getMessage(),
+        ]);
+        
+        return back()->withErrors(['error' => 'Failed to create post: ' . $e->getMessage()])->withInput();
     }
+}
 
     /**
      * Delete a post.

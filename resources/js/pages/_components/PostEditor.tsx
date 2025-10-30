@@ -6,6 +6,7 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Progress } from '@/components/ui/progress';
 import {
     Tooltip,
     TooltipContent,
@@ -19,11 +20,13 @@ import {
     Image02Icon,
     LeftToRightListTriangleIcon,
     Location01Icon,
+    VideoReplayIcon,
 } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { router } from '@inertiajs/react';
-import { Globe, Users, X } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import axios from 'axios';
+import { Globe, Play, Users, X } from 'lucide-react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 interface PostEditorProps {
@@ -36,17 +39,30 @@ interface PostEditorProps {
     onPostCreated?: () => void;
 }
 
+interface MediaFile {
+    file: File;
+    preview: string;
+    type: 'image' | 'video';
+    uploadId?: number;
+    uploadProgress?: number;
+    isUploading?: boolean;
+}
+
+const CHUNK_SIZE = 1024 * 1024; // 1MB chunks
+const MAX_VIDEO_SIZE = 1024 * 1024 * 1024; // 1GB max
+const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB max per image
+
 export function PostEditor({ user, onPostCreated }: PostEditorProps) {
     const [content, setContent] = useState('');
-    const [images, setImages] = useState<File[]>([]);
-    const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+    const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
     const [audience, setAudience] = useState<'everyone' | 'circle'>('everyone');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [activeTab, setActiveTab] = useState<'for-you' | 'following'>(
         'for-you',
     );
     const textareaRef = useRef<HTMLTextAreaElement>(null);
-    const fileInputRef = useRef<HTMLInputElement>(null);
+    const imageInputRef = useRef<HTMLInputElement>(null);
+    const videoInputRef = useRef<HTMLInputElement>(null);
     const maxLength = 280;
 
     // Auto-resize textarea
@@ -61,36 +77,194 @@ export function PostEditor({ user, onPostCreated }: PostEditorProps) {
     // Handle image upload
     const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = Array.from(e.target.files || []);
-        if (files.length + images.length > 4) {
-            toast('You can upload up to 4 images per post.');
+
+        // Check limits
+        if (mediaFiles.length + files.length > 4) {
+            toast.error('You can upload up to 4 images per post.');
             return;
         }
 
-        setImages([...images, ...files]);
+        // Check if trying to mix video with images
+        const hasVideo = mediaFiles.some((m) => m.type === 'video');
+        if (hasVideo && files.length > 0) {
+            toast.error('Cannot mix images with video. Remove video first.');
+            return;
+        }
 
-        // Create previews
-        const newPreviews: string[] = [];
+        const newFiles: MediaFile[] = [];
+
         files.forEach((file) => {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                newPreviews.push(reader.result as string);
-                if (newPreviews.length === files.length) {
-                    setImagePreviews([...imagePreviews, ...newPreviews]);
-                }
-            };
-            reader.readAsDataURL(file);
+            // Validate size
+            if (file.size > MAX_IMAGE_SIZE) {
+                toast.error(
+                    `Image ${file.name} is too large. Max size is 10MB.`,
+                );
+                return;
+            }
+
+            // Create preview
+            const preview = URL.createObjectURL(file);
+            newFiles.push({
+                file,
+                preview,
+                type: 'image',
+            });
         });
+
+        setMediaFiles([...mediaFiles, ...newFiles]);
+
+        // Reset input
+        if (e.target) {
+            e.target.value = '';
+        }
     };
 
-    // Remove image
-    const removeImage = (index: number) => {
-        setImages(images.filter((_, i) => i !== index));
-        setImagePreviews(imagePreviews.filter((_, i) => i !== index));
+    // Handle video upload
+    const handleVideoUpload = async (
+        e: React.ChangeEvent<HTMLInputElement>,
+    ) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        // Check if already has media
+        if (mediaFiles.length > 0) {
+            toast.error('Remove existing media before uploading video.');
+            return;
+        }
+
+        // Validate video size
+        if (file.size > MAX_VIDEO_SIZE) {
+            toast.error('Video is too large. Maximum size is 1GB.');
+            return;
+        }
+
+        // Validate video type
+        if (!file.type.startsWith('video/')) {
+            toast.error('Please select a valid video file.');
+            return;
+        }
+
+        // Create preview
+        const preview = URL.createObjectURL(file);
+        const videoFile: MediaFile = {
+            file,
+            preview,
+            type: 'video',
+            uploadProgress: 0,
+            isUploading: true,
+        };
+
+        setMediaFiles([videoFile]);
+
+        // Start chunked upload
+        try {
+            await uploadVideoInChunks(file, 0);
+        } catch (error) {
+            console.error('Video upload error:', error);
+            toast.error('Failed to upload video. Please try again.');
+            setMediaFiles([]);
+        }
+
+        // Reset input
+        if (e.target) {
+            e.target.value = '';
+        }
+    };
+
+    // Upload video in chunks
+    const uploadVideoInChunks = async (file: File, index: number) => {
+        const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+
+        try {
+            // 1. Initialize upload
+            const { data: initData } = await axios.post('/upload/initialize', {
+                filename: file.name,
+                filesize: file.size,
+                total_chunks: totalChunks,
+            });
+
+            const uploadId = initData.upload_id;
+
+            // Update media file with upload ID
+            setMediaFiles((prev) =>
+                prev.map((m, i) => (i === index ? { ...m, uploadId } : m)),
+            );
+
+            // 2. Upload chunks
+            for (let i = 0; i < totalChunks; i++) {
+                const start = i * CHUNK_SIZE;
+                const end = Math.min(start + CHUNK_SIZE, file.size);
+                const chunk = file.slice(start, end);
+
+                const formData = new FormData();
+                formData.append('upload_id', uploadId.toString());
+                formData.append('chunk_number', i.toString());
+                formData.append('chunk', chunk);
+
+                await axios.post('/upload/chunk', formData, {
+                    headers: {
+                        'Content-Type': 'multipart/form-data',
+                    },
+                });
+
+                // Update progress
+                const progress = Math.round(((i + 1) / totalChunks) * 100);
+                setMediaFiles((prev) =>
+                    prev.map((m, idx) =>
+                        idx === index ? { ...m, uploadProgress: progress } : m,
+                    ),
+                );
+            }
+
+            // 3. Complete upload
+            await axios.post('/upload/complete', {
+                upload_id: uploadId,
+            });
+
+            // Mark as done
+            setMediaFiles((prev) =>
+                prev.map((m, i) =>
+                    i === index
+                        ? { ...m, isUploading: false, uploadProgress: 100 }
+                        : m,
+                ),
+            );
+
+            toast.success('Video uploaded successfully!');
+        } catch (error) {
+            console.error('Chunk upload error:', error);
+            throw error;
+        }
+    };
+
+    // Remove media file
+    const removeMedia = (index: number) => {
+        const media = mediaFiles[index];
+
+        // Revoke object URL to free memory
+        URL.revokeObjectURL(media.preview);
+
+        setMediaFiles(mediaFiles.filter((_, i) => i !== index));
     };
 
     // Handle post submission
-    const handleSubmit = async () => {
-        if (!content.trim() && images.length === 0) return;
+    const handleSubmit = async (e?: FormEvent) => {
+        if (e) e.preventDefault();
+
+        if (!content.trim() && mediaFiles.length === 0) {
+            toast.error('Post must have content or media.');
+            return;
+        }
+
+        // Check if video is still uploading
+        const uploadingVideo = mediaFiles.find(
+            (m) => m.type === 'video' && m.isUploading,
+        );
+        if (uploadingVideo) {
+            toast.error('Please wait for video to finish uploading.');
+            return;
+        }
+
         if (isSubmitting) return;
 
         setIsSubmitting(true);
@@ -99,19 +273,38 @@ export function PostEditor({ user, onPostCreated }: PostEditorProps) {
         formData.append('content', content);
         formData.append('audience', audience);
 
-        images.forEach((image, index) => {
-            formData.append(`images[${index}]`, image);
-        });
+        // Add images directly
+        mediaFiles
+            .filter((m) => m.type === 'image')
+            .forEach((media, index) => {
+                formData.append(`images[${index}]`, media.file);
+            });
+
+        // Add video upload IDs
+        const videoUploadIds = mediaFiles
+            .filter((m) => m.type === 'video' && m.uploadId)
+            .map((m) => m.uploadId);
+
+        if (videoUploadIds.length > 0) {
+            formData.append('video_upload_ids', JSON.stringify(videoUploadIds));
+        }
 
         try {
             router.post('/posts', formData, {
                 preserveScroll: true,
                 preserveState: true,
                 onSuccess: () => {
+                    // Clean up object URLs
+                    mediaFiles.forEach((m) => URL.revokeObjectURL(m.preview));
+
                     setContent('');
-                    setImages([]);
-                    setImagePreviews([]);
+                    setMediaFiles([]);
                     if (onPostCreated) onPostCreated();
+                    toast.success('Post created successfully!');
+                },
+                onError: (errors) => {
+                    console.error('Post creation error:', errors);
+                    toast.error('Failed to create post. Please try again.');
                 },
                 onFinish: () => {
                     setIsSubmitting(false);
@@ -120,6 +313,7 @@ export function PostEditor({ user, onPostCreated }: PostEditorProps) {
         } catch (error) {
             console.error('Error posting:', error);
             setIsSubmitting(false);
+            toast.error('Failed to create post.');
         }
     };
 
@@ -134,9 +328,11 @@ export function PostEditor({ user, onPostCreated }: PostEditorProps) {
         return 'rgb(59 130 246)'; // blue-500
     };
 
+    const hasVideo = mediaFiles.some((m) => m.type === 'video');
+
     return (
         <div className="border-b bg-card">
-            {/* Tab Navigation - Twitter/X style with underline only */}
+            {/* Tab Navigation */}
             <div className="flex border-b">
                 <button
                     onClick={() => setActiveTab('for-you')}
@@ -193,7 +389,6 @@ export function PostEditor({ user, onPostCreated }: PostEditorProps) {
                                 <Button
                                     variant="outline"
                                     size="sm"
-                                    disabled
                                     className="h-7 gap-1.5 rounded-full text-primary hover:bg-primary/10"
                                 >
                                     {audience === 'everyone' ? (
@@ -245,7 +440,7 @@ export function PostEditor({ user, onPostCreated }: PostEditorProps) {
                             </DropdownMenuContent>
                         </DropdownMenu>
 
-                        {/* Textarea - Custom styled without borders */}
+                        {/* Textarea */}
                         <textarea
                             ref={textareaRef}
                             value={content}
@@ -255,46 +450,92 @@ export function PostEditor({ user, onPostCreated }: PostEditorProps) {
                             style={{ maxHeight: '300px' }}
                         />
 
-                        {/* Image Previews */}
-                        {imagePreviews.length > 0 && (
+                        {/* Media Previews */}
+                        {mediaFiles.length > 0 && (
                             <div
                                 className={cn(
                                     'grid gap-2',
-                                    imagePreviews.length === 1 && 'grid-cols-1',
-                                    imagePreviews.length === 2 && 'grid-cols-2',
-                                    imagePreviews.length === 3 && 'grid-cols-2',
-                                    imagePreviews.length === 4 && 'grid-cols-2',
+                                    mediaFiles.length === 1 && 'grid-cols-1',
+                                    mediaFiles.length >= 2 && 'grid-cols-2',
                                 )}
                             >
-                                {imagePreviews.map((preview, index) => (
+                                {mediaFiles.map((media, index) => (
                                     <div
                                         key={index}
                                         className={cn(
                                             'group relative overflow-hidden rounded-2xl bg-muted',
-                                            imagePreviews.length === 3 &&
+                                            mediaFiles.length === 3 &&
                                                 index === 0 &&
                                                 'row-span-2',
                                         )}
                                     >
-                                        <img
-                                            src={preview}
-                                            alt={`Preview ${index + 1}`}
-                                            className="h-full w-full object-cover"
-                                            style={{
-                                                maxHeight:
-                                                    imagePreviews.length === 1
-                                                        ? '400px'
-                                                        : '200px',
-                                            }}
-                                        />
-                                        <Button
-                                            onClick={() => removeImage(index)}
-                                            size="icon"
-                                            variant="secondary"
-                                            className="absolute top-2 right-2 h-8 w-8 rounded-full bg-black/60 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-black/80"
-                                        >
-                                            <X className="h-4 w-4 text-white" />
-                                        </Button>
+                                        {media.type === 'image' ? (
+                                            <img
+                                                src={media.preview}
+                                                alt={`Preview ${index + 1}`}
+                                                className="h-full w-full object-cover"
+                                                style={{
+                                                    maxHeight:
+                                                        mediaFiles.length === 1
+                                                            ? '400px'
+                                                            : '200px',
+                                                }}
+                                            />
+                                        ) : (
+                                            <div className="relative">
+                                                <video
+                                                    src={media.preview}
+                                                    className="h-full w-full object-cover"
+                                                    style={{
+                                                        maxHeight: '400px',
+                                                    }}
+                                                />
+                                                <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                                                    <div className="rounded-full bg-black/70 p-3">
+                                                        <Play className="h-6 w-6 fill-white text-white" />
+                                                    </div>
+                                                </div>
+
+                                                {/* Upload Progress */}
+                                                {media.isUploading && (
+                                                    <div className="absolute right-0 bottom-0 left-0 bg-black/80 p-3">
+                                                        <div className="space-y-2">
+                                                            <div className="flex items-center justify-between text-xs text-white">
+                                                                <span>
+                                                                    Uploading...
+                                                                </span>
+                                                                <span className="font-semibold">
+                                                                    {media.uploadProgress ||
+                                                                        0}
+                                                                    %
+                                                                </span>
+                                                            </div>
+                                                            <Progress
+                                                                value={
+                                                                    media.uploadProgress ||
+                                                                    0
+                                                                }
+                                                                className="h-2"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {/* Remove button */}
+                                        {!media.isUploading && (
+                                            <Button
+                                                onClick={() =>
+                                                    removeMedia(index)
+                                                }
+                                                size="icon"
+                                                variant="secondary"
+                                                className="absolute top-2 right-2 h-8 w-8 rounded-full bg-black/60 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-black/80"
+                                            >
+                                                <X className="h-4 w-4 text-white" />
+                                            </Button>
+                                        )}
                                     </div>
                                 ))}
                             </div>
@@ -304,39 +545,76 @@ export function PostEditor({ user, onPostCreated }: PostEditorProps) {
                         <div className="flex items-center justify-between border-t pt-3">
                             {/* Action Buttons */}
                             <div className="-ml-2 flex items-center">
+                                {/* Hidden inputs */}
                                 <input
-                                    ref={fileInputRef}
+                                    ref={imageInputRef}
                                     type="file"
                                     accept="image/*"
                                     multiple
                                     onChange={handleImageUpload}
                                     className="hidden"
                                 />
+                                <input
+                                    ref={videoInputRef}
+                                    type="file"
+                                    accept="video/*"
+                                    onChange={handleVideoUpload}
+                                    className="hidden"
+                                />
 
                                 <TooltipProvider>
+                                    {/* Image Upload */}
                                     <Tooltip>
                                         <TooltipTrigger asChild>
                                             <Button
                                                 onClick={() =>
-                                                    fileInputRef.current?.click()
+                                                    imageInputRef.current?.click()
                                                 }
                                                 variant="ghost"
                                                 size="icon"
                                                 className="h-9 w-9 rounded-full text-primary hover:bg-primary/10"
-                                                disabled={images.length >= 4}
+                                                disabled={
+                                                    mediaFiles.length >= 4 ||
+                                                    hasVideo
+                                                }
                                             >
                                                 <HugeiconsIcon
                                                     icon={Image02Icon}
-                                                    size={24}
+                                                    size={20}
                                                     color="currentColor"
                                                 />
                                             </Button>
                                         </TooltipTrigger>
                                         <TooltipContent>
-                                            <p>Add images</p>
+                                            <p>Add images (max 4)</p>
                                         </TooltipContent>
                                     </Tooltip>
 
+                                    {/* Video Upload */}
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <Button
+                                                onClick={() =>
+                                                    videoInputRef.current?.click()
+                                                }
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-9 w-9 rounded-full text-primary hover:bg-primary/10"
+                                                disabled={mediaFiles.length > 0}
+                                            >
+                                                <HugeiconsIcon
+                                                    icon={VideoReplayIcon}
+                                                    size={20}
+                                                    color="currentColor"
+                                                />
+                                            </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                            <p>Add video (max 1GB)</p>
+                                        </TooltipContent>
+                                    </Tooltip>
+
+                                    {/* Other buttons */}
                                     <Tooltip>
                                         <TooltipTrigger asChild>
                                             <Button
@@ -349,7 +627,7 @@ export function PostEditor({ user, onPostCreated }: PostEditorProps) {
                                                     icon={
                                                         LeftToRightListTriangleIcon
                                                     }
-                                                    size={24}
+                                                    size={20}
                                                     color="currentColor"
                                                 />
                                             </Button>
@@ -369,9 +647,8 @@ export function PostEditor({ user, onPostCreated }: PostEditorProps) {
                                             >
                                                 <HugeiconsIcon
                                                     icon={Happy01Icon}
-                                                    size={24}
+                                                    size={20}
                                                     color="currentColor"
-                                                    strokeWidth={2}
                                                 />
                                             </Button>
                                         </TooltipTrigger>
@@ -390,9 +667,8 @@ export function PostEditor({ user, onPostCreated }: PostEditorProps) {
                                             >
                                                 <HugeiconsIcon
                                                     icon={Calendar02Icon}
-                                                    size={24}
+                                                    size={20}
                                                     color="currentColor"
-                                                    strokeWidth={2}
                                                 />
                                             </Button>
                                         </TooltipTrigger>
@@ -411,9 +687,8 @@ export function PostEditor({ user, onPostCreated }: PostEditorProps) {
                                             >
                                                 <HugeiconsIcon
                                                     icon={Location01Icon}
-                                                    size={24}
+                                                    size={20}
                                                     color="currentColor"
-                                                    strokeWidth={2}
                                                 />
                                             </Button>
                                         </TooltipTrigger>
@@ -429,7 +704,6 @@ export function PostEditor({ user, onPostCreated }: PostEditorProps) {
                                 {content.length > 0 && (
                                     <div className="relative h-8 w-8">
                                         <svg className="h-8 w-8 -rotate-90">
-                                            {/* Background circle */}
                                             <circle
                                                 cx="16"
                                                 cy="16"
@@ -439,7 +713,6 @@ export function PostEditor({ user, onPostCreated }: PostEditorProps) {
                                                 fill="none"
                                                 className="text-muted-foreground/20"
                                             />
-                                            {/* Progress circle */}
                                             <circle
                                                 cx="16"
                                                 cy="16"
@@ -470,17 +743,22 @@ export function PostEditor({ user, onPostCreated }: PostEditorProps) {
                                 )}
 
                                 <Button
-                                    onClick={handleSubmit}
+                                    onClick={() => handleSubmit()}
                                     disabled={
                                         (!content.trim() &&
-                                            images.length === 0) ||
+                                            mediaFiles.length === 0) ||
                                         remainingChars < 0 ||
-                                        isSubmitting
+                                        isSubmitting ||
+                                        mediaFiles.some((m) => m.isUploading)
                                     }
                                     size="sm"
                                     className="rounded-full px-4 font-semibold"
                                 >
-                                    {isSubmitting ? 'Posting...' : 'Post'}
+                                    {isSubmitting
+                                        ? 'Posting...'
+                                        : mediaFiles.some((m) => m.isUploading)
+                                          ? 'Uploading...'
+                                          : 'Post'}
                                 </Button>
                             </div>
                         </div>
