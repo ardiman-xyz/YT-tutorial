@@ -1,6 +1,5 @@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { router } from '@inertiajs/react';
 import { FormEvent, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { AudienceSelector } from './PostEditor/AudienceSelector';
@@ -84,27 +83,27 @@ export function PostEditor({ user, onPostCreated }: PostEditorProps) {
             formData.append('video_upload_ids', JSON.stringify(videoUploadIds));
         }
 
-        try {
-            router.post('/posts', formData, {
-                preserveScroll: true,
-                preserveState: true,
-                onSuccess: () => {
-                    clearMedia();
-                    setContent('');
-                    onPostCreated?.();
-                    toast.success('Post created successfully!');
-                },
-                onError: (errors) => {
-                    console.error('Post creation error:', errors);
-                    toast.error('Failed to create post. Please try again.');
-                },
-                onFinish: () => setIsSubmitting(false),
-            });
-        } catch (error) {
-            console.error('Error posting:', error);
-            setIsSubmitting(false);
-            toast.error('Failed to create post.');
-        }
+        // try {
+        //     router.post('/posts', formData, {
+        //         preserveScroll: true,
+        //         preserveState: true,
+        //         onSuccess: () => {
+        //             clearMedia();
+        //             setContent('');
+        //             onPostCreated?.();
+        //             toast.success('Post created successfully!');
+        //         },
+        //         onError: (errors) => {
+        //             console.error('Post creation error:', errors);
+        //             toast.error('Failed to create post. Please try again.');
+        //         },
+        //         onFinish: () => setIsSubmitting(false),
+        //     });
+        // } catch (error) {
+        //     console.error('Error posting:', error);
+        //     setIsSubmitting(false);
+        //     toast.error('Failed to create post.');
+        // }
     };
 
     const isPostDisabled =
