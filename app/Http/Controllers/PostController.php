@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\PostEvent;
 use App\Events\PostLiked;
 use App\Models\FileUpload;
 use App\Models\Post;
@@ -183,6 +184,20 @@ class PostController extends Controller
                     ]);
                 }
             }
+
+            $post->load('user');
+
+            event(new PostEvent([
+                'id' => $post->id,
+                'content' => $post->content,
+                'user' => [
+                    'id' => $post->user->id,
+                    'name' => $post->user->name,
+                    'username' => $post->user->username,
+                    'avatar' => $post->user->avatar_url ?? $post->user->profile_photo_url ?? null,
+                ],
+                'created_at' => $post->created_at->toISOString(),
+            ]));
 
             DB::commit();
 

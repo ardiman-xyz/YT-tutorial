@@ -17,7 +17,7 @@ Route::get('/', function () {
 })->name('home');
 
 Route::middleware(['auth', 'verified'])->group(function () {
-     Route::get('/dashboard', [PostController::class, 'index'])->name('dashboard');
+    Route::get('/dashboard', [PostController::class, 'index'])->name('dashboard');
 
     Route::get('/upload-file', [FileUploadController::class, 'index'])->name('upload.index');
     Route::post('/upload-file', [FileUploadController::class, 'store'])->name('upload.store');
@@ -30,14 +30,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/notifications/{id}/read', [NotificationController::class, 'markAsRead'])->name('notifications.read');
     Route::post('/notifications/read-all', [NotificationController::class, 'markAllAsRead'])->name('notifications.read-all');
 
-   
-
     Route::get('/explore', [ExploreController::class, 'index'])->name('explore.index');
     Route::get('/search', [ExploreController::class, 'search'])->name('explore.search');
 
     Route::get('/bookmarks', [BookmarksController::class, 'index'])->name('bookmarks.index');
     Route::post('/bookmarks/clear', [BookmarksController::class, 'clearAll'])->name('bookmarks.clear');
-
 
     Route::post('/posts', [PostController::class, 'store'])->name('posts.store');
     Route::get('/status/{post}', [PostController::class, 'show'])->name('posts.show');
@@ -45,15 +42,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/posts/{post}/like', [PostController::class, 'toggleLike'])->name('posts.like');
     Route::post('/users/{user}/follow', [FollowController::class, 'toggle'])->name('users.follow');
     Route::post('/posts/{post}/repost', [PostController::class, 'toggleRepost'])->name('posts.repost');
-    Route::post('/posts/{post}/bookmark', [PostController::class, 'toggleBookmark'])->name('posts.bookmark');
-
+    
     Route::post('/posts/{post}/bookmark', [PostController::class, 'toggleBookmark'])->name('posts.bookmark');
     Route::post('/posts/{post}/replies', [ReplyController::class, 'store'])->name('posts.replies.store');
     Route::get('/posts/{post}/replies', [ReplyController::class, 'index'])->name('posts.replies.index');
     Route::delete('/posts/{post}/replies/{reply}', [ReplyController::class, 'destroy'])->name('posts.replies.destroy');
 
-    Route::get('/profile/edit', [ProfileController::class, 'edit'])->name('profile.edit');
-    Route::post('/profile/update', [ProfileController::class, 'update'])->name('profile.update');
+    // ✅ Ganti nama route menjadi lebih spesifik (user profile, bukan account settings)
+    Route::get('/profile/{user}/edit', [ProfileController::class, 'edit'])->name('user.profile.edit'); // 👈 Ganti nama
+    Route::post('/profile/{user}/update', [ProfileController::class, 'update'])->name('user.profile.update'); // 👈 Ganti nama
+    
     Route::get('/profile/{user}', [ProfileController::class, 'show'])->name('profile.show');
     Route::get('/profile/{user}/likes', [ProfileController::class, 'likes'])->name('profile.likes');
     Route::get('/profile/{user}/media', [ProfileController::class, 'media'])->name('profile.media');
@@ -61,8 +59,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/notifications/unread-count', [NotificationController::class, 'getUnreadCount'])->name('notifications.unread-count');
     Route::post('/notifications/mark-all-read', [NotificationController::class, 'markAllAsRead'])->name('notifications.mark-all-read');
 
-
-     Route::get('/messages', [MessagesController::class, 'index'])->name('messages.index');
+    Route::get('/messages', [MessagesController::class, 'index'])->name('messages.index');
     Route::get('/messages/new', [MessagesController::class, 'create'])->name('messages.new');
     Route::post('/messages/conversation', [MessagesController::class, 'createConversation'])->name('messages.conversation.create');
     Route::get('/messages/search-users', [MessagesController::class, 'searchUsers'])->name('messages.search-users');

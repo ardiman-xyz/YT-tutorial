@@ -39,6 +39,7 @@ export interface Post {
     likes_count?: number;
     views_count?: number;
     bookmarks_count?: number;
+    parent_id?: number | null;
 }
 
 export interface CreatePostData {

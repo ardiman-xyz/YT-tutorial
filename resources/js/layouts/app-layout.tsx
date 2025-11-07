@@ -1,12 +1,14 @@
 import LeftSidebar from '@/components/LeftSidebar';
 import RightSidebar from '@/components/RightSidebar';
 import { useNotifications } from '@/hooks/useNotifications';
+import NewPostListener from '@/pages/_components/NewPostListener';
 import { usePage } from '@inertiajs/react';
 import { Toaster } from 'sonner';
 
 type AppLayoutProps = {
     children: React.ReactNode;
-    isRightSidebarOpen?: boolean; // 👉 parameter baru (opsional)
+    isRightSidebarOpen?: boolean;
+    enableNewPostListener?: boolean;
 };
 
 export default function AppLayout({
@@ -19,7 +21,9 @@ export default function AppLayout({
 
     return (
         <div className="flex justify-center">
-            <Toaster position="bottom-center" />
+            <Toaster position="bottom-center" richColors />
+
+            <NewPostListener />
 
             <LeftSidebar
                 unreadCount={unreadCount}

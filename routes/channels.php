@@ -25,3 +25,7 @@ Broadcast::channel('conversation.{conversationId}', function ($user, $conversati
         ->where('user_id', $user->id)
         ->exists();
 });
+
+Broadcast::channel("post", function() {
+    return true;
+});

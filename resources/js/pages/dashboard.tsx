@@ -1,14 +1,29 @@
 import { ConfirmDialog } from '@/components/ConfirmDialog';
-import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
 import type { Post as PostType, User } from '@/types/post';
 import { Head, router, usePage } from '@inertiajs/react';
+import { useEcho } from '@laravel/echo-react';
 import axios from 'axios';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { Post } from './_components/Post';
 import { PostEditor } from './_components/PostEditor';
 import { ReplyDialog } from './_components/ReplyDialog';
+
+type NewPostEventData = {
+    message: string;
+    post: {
+        id: number;
+        content: string;
+        user: {
+            id: number;
+            name: string;
+            username: string;
+            avatar: string;
+        };
+        created_at: string;
+    };
+};
 
 export default function Dashboard() {
     const { posts: initialPosts, auth } = usePage<any>().props as {
@@ -17,6 +32,7 @@ export default function Dashboard() {
     };
 
     const [posts, setPosts] = useState<PostType[]>(initialPosts);
+    const [newPostsAvailable, setNewPostsAvailable] = useState(0);
 
     const [deleteDialog, setDeleteDialog] = useState<{
         open: boolean;
@@ -32,6 +48,37 @@ export default function Dashboard() {
     }>({
         open: false,
         post: null,
+    });
+
+    // 🎉 Listen to new posts event
+    useEcho('post', '.NewPost', (e: NewPostEventData) => {
+        const newPost: any = {
+            id: e.post.id,
+            content: e.post.content,
+            user_id: e.post.user.id,
+            user: {
+                id: e.post.user.id,
+                name: e.post.user.name,
+                username: e.post.user.username,
+                avatar: e.post.user.avatar,
+                is_verified: false,
+            },
+            created_at: e.post.created_at,
+            likes_count: 0,
+            replies_count: 0,
+            reposts_count: 0,
+            bookmarks_count: 0,
+            is_liked: false,
+            is_reposted: false,
+            is_bookmarked: false,
+            is_following: false,
+            media: [],
+            parent_id: null,
+        };
+
+        setPosts((prevPosts) => [newPost, ...prevPosts]);
+
+        setNewPostsAvailable((prev) => prev + 1);
     });
 
     const formatTimestamp = (dateString: string) => {
@@ -54,6 +101,13 @@ export default function Dashboard() {
 
     const handlePostCreated = () => {
         router.reload({ only: ['posts'] });
+        setNewPostsAvailable(0); // Reset counter
+    };
+
+    const handleShowNewPosts = () => {
+        // Scroll ke top
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        setNewPostsAvailable(0);
     };
 
     const handleDeleteClick = (postId: number, e?: React.MouseEvent) => {
@@ -198,15 +252,19 @@ export default function Dashboard() {
                     user={auth.user}
                     onPostCreated={handlePostCreated}
                 />
-
-                {posts.length > 0 && (
+                {/* Show new posts button
+                {newPostsAvailable > 0 && (
                     <div className="border-b py-3 text-center">
-                        <Button variant="link" className="text-primary">
-                            Show {posts.length} posts
+                        <Button
+                            variant="link"
+                            className="font-semibold text-primary"
+                            onClick={handleShowNewPosts}
+                        >
+                            Show {newPostsAvailable} new{' '}
+                            {newPostsAvailable === 1 ? 'post' : 'posts'}
                         </Button>
                     </div>
-                )}
-
+                )} */}
                 <div className="divide-y divide-border">
                     {posts.map((post) => (
                         <div
@@ -246,7 +304,6 @@ export default function Dashboard() {
                         </div>
                     ))}
                 </div>
-
                 {posts.length === 0 && (
                     <div className="p-8 text-center text-muted-foreground">
                         <p className="text-lg font-semibold">No posts yet</p>
@@ -255,7 +312,6 @@ export default function Dashboard() {
                         </p>
                     </div>
                 )}
-
                 <ConfirmDialog
                     open={deleteDialog.open}
                     onOpenChange={(open) =>
@@ -268,7 +324,6 @@ export default function Dashboard() {
                     cancelText="Cancel"
                     variant="destructive"
                 />
-
                 {replyDialog.post && (
                     <ReplyDialog
                         open={replyDialog.open}
