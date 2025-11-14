@@ -33,6 +33,7 @@ export default function Dashboard() {
 
     const [posts, setPosts] = useState<PostType[]>(initialPosts);
     const [newPostsAvailable, setNewPostsAvailable] = useState(0);
+    const [newPostIds, setNewPostIds] = useState<Set<number>>(new Set());
 
     const [deleteDialog, setDeleteDialog] = useState<{
         open: boolean;
@@ -77,8 +78,17 @@ export default function Dashboard() {
         };
 
         setPosts((prevPosts) => [newPost, ...prevPosts]);
-
+        setNewPostIds((prev) => new Set([...prev, newPost.id]));
         setNewPostsAvailable((prev) => prev + 1);
+
+        // Remove animation class after animation completes
+        setTimeout(() => {
+            setNewPostIds((prev) => {
+                const updated = new Set(prev);
+                updated.delete(newPost.id);
+                return updated;
+            });
+        }, 1100);
     });
 
     const formatTimestamp = (dateString: string) => {
@@ -101,12 +111,6 @@ export default function Dashboard() {
 
     const handlePostCreated = () => {
         router.reload({ only: ['posts'] });
-        setNewPostsAvailable(0); // Reset counter
-    };
-
-    const handleShowNewPosts = () => {
-        // Scroll ke top
-        window.scrollTo({ top: 0, behavior: 'smooth' });
         setNewPostsAvailable(0);
     };
 
@@ -270,7 +274,11 @@ export default function Dashboard() {
                         <div
                             key={post.id}
                             onClick={() => handlePostClick(post)}
-                            className="cursor-pointer"
+                            className={`cursor-pointer ${
+                                newPostIds.has(post.id)
+                                    ? 'animate-new-post'
+                                    : ''
+                            }`}
                         >
                             <Post
                                 user={{

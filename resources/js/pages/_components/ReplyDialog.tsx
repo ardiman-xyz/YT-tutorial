@@ -7,9 +7,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { router } from '@inertiajs/react';
 import axios from 'axios';
-import { X } from 'lucide-react';
 import { useState } from 'react';
 
 interface User {
@@ -59,7 +57,7 @@ export function ReplyDialog({
             onOpenChange(false);
 
             // Reload page to show new reply
-            router.reload();
+            window.location.reload();
         } catch (error) {
             console.error('Error posting reply:', error);
             alert('Failed to post reply. Please try again.');
@@ -72,17 +70,7 @@ export function ReplyDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-xl">
                 <DialogHeader>
-                    <div className="flex items-center justify-between">
-                        <DialogTitle>Reply</DialogTitle>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => onOpenChange(false)}
-                            className="h-8 w-8"
-                        >
-                            <X className="h-4 w-4" />
-                        </Button>
-                    </div>
+                    <DialogTitle>Reply</DialogTitle>
                 </DialogHeader>
 
                 <div className="space-y-4">
