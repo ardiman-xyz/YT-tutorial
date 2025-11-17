@@ -21,6 +21,22 @@ type NewPostEventData = {
             username: string;
             avatar: string;
         };
+        media: Array<{
+            id: number;
+            post_id: number;
+            type: string;
+            url: string;
+            thumbnail_url: string | null;
+            duration: number | null;
+        }>;
+        likes_count: number;
+        replies_count: number;
+        reposts_count: number;
+        bookmarks_count: number;
+        is_liked: boolean;
+        is_reposted: boolean;
+        is_bookmarked: boolean;
+        is_following: boolean;
         created_at: string;
     };
 };
@@ -65,15 +81,15 @@ export default function Dashboard() {
                 is_verified: false,
             },
             created_at: e.post.created_at,
-            likes_count: 0,
-            replies_count: 0,
-            reposts_count: 0,
-            bookmarks_count: 0,
-            is_liked: false,
-            is_reposted: false,
-            is_bookmarked: false,
-            is_following: false,
-            media: [],
+            likes_count: e.post.likes_count,
+            replies_count: e.post.replies_count,
+            reposts_count: e.post.reposts_count,
+            bookmarks_count: e.post.bookmarks_count,
+            is_liked: e.post.is_liked,
+            is_reposted: e.post.is_reposted,
+            is_bookmarked: e.post.is_bookmarked,
+            is_following: e.post.is_following,
+            media: e.post.media || [],
             parent_id: null,
         };
 

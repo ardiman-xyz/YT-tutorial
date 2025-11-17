@@ -185,7 +185,7 @@ class PostController extends Controller
                 }
             }
 
-            $post->load('user');
+            $post->load('user', 'media');
 
             event(new PostEvent([
                 'id' => $post->id,
@@ -196,6 +196,24 @@ class PostController extends Controller
                     'username' => $post->user->username,
                     'avatar' => $post->user->avatar_url ?? $post->user->profile_photo_url ?? null,
                 ],
+                'media' => $post->media->map(function ($media) {
+                    return [
+                        'id' => $media->id,
+                        'post_id' => $media->post_id,
+                        'type' => $media->type,
+                        'url' => $media->url,
+                        'thumbnail_url' => $media->thumbnail_url,
+                        'duration' => $media->duration,
+                    ];
+                })->toArray(),
+                'likes_count' => 0,
+                'reposts_count' => 0,
+                'replies_count' => 0,
+                'bookmarks_count' => 0,
+                'is_liked' => false,
+                'is_reposted' => false,
+                'is_bookmarked' => false,
+                'is_following' => false,
                 'created_at' => $post->created_at->toISOString(),
             ]));
 
