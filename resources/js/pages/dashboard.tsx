@@ -135,22 +135,40 @@ export default function Dashboard() {
         setDeleteDialog({ open: true, postId });
     };
 
-    const handleDeleteConfirm = () => {
-        if (deleteDialog.postId) {
-            // Optimistic update - remove from UI immediately
-            setPosts((prevPosts) =>
-                prevPosts.filter((post) => post.id !== deleteDialog.postId),
-            );
-            setDeleteDialog({ open: false, postId: null });
+    // const handleDeleteConfirm = () => {
+    //     if (deleteDialog.postId) {
+    //         // Optimistic update - remove from UI immediately
+    //         setPosts((prevPosts) =>
+    //             prevPosts.filter((post) => post.id !== deleteDialog.postId),
+    //         );
+    //         setDeleteDialog({ open: false, postId: null });
 
-            // Send delete request
-            router.delete(`/posts/${deleteDialog.postId}`, {
-                preserveScroll: true,
-                onError: () => {
-                    // If error, reload to restore correct state
-                    router.reload({ only: ['posts'] });
-                },
-            });
+    //         // Send delete request
+    //         router.delete(`/posts/${deleteDialog.postId}`, {
+    //             preserveScroll: true,
+    //             onError: () => {
+    //                 // If error, reload to restore correct state
+    //                 router.reload({ only: ['posts'] });
+    //             },
+    //         });
+    //     }
+    // };
+
+    const handleDeleteConfirm = async () => {
+        if (deleteDialog.postId) {
+            try {
+                await axios.delete(`/posts/${deleteDialog.postId}`);
+
+                // Remove post from state after successful deletion
+                setPosts((prevPosts) =>
+                    prevPosts.filter((post) => post.id !== deleteDialog.postId),
+                );
+
+                setDeleteDialog({ open: false, postId: null });
+            } catch (error) {
+                console.error('Error deleting post:', error);
+                setDeleteDialog({ open: false, postId: null });
+            }
         }
     };
 

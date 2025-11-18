@@ -10,6 +10,7 @@ use App\Models\Hashtag;
 use App\Models\Mention;
 use App\Models\Notification;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -238,29 +239,97 @@ class PostController extends Controller
     /**
      * Delete a post.
      */
-    public function destroy(Post $post)
+    // public function destroy(Post $post)
+    // {
+    //     if ($post->user_id !== auth()->id()) {
+    //         return back()->withErrors(['error' => 'Unauthorized action.']);
+    //     }
+
+    //     try {
+    //         DB::beginTransaction();
+
+    //         foreach ($post->media as $media) {
+    //             $path = str_replace('/storage/', '', $media->url);
+    //             Storage::disk('public')->delete($path);
+    //         }
+
+    //         $post->delete();
+
+    //         DB::commit();
+
+    //         return back()->with('success', 'Post deleted successfully!');
+
+    //     } catch (\Exception $e) {
+    //         DB::rollBack();
+    //         return back()->withErrors(['error' => 'Failed to delete post: ' . $e->getMessage()]);
+    //     }
+    // }
+
+     public function destroy(Post $post)
     {
-        if ($post->user_id !== auth()->id()) {
-            return back()->withErrors(['error' => 'Unauthorized action.']);
-        }
-
         try {
-            DB::beginTransaction();
-
-            foreach ($post->media as $media) {
-                $path = str_replace('/storage/', '', $media->url);
-                Storage::disk('public')->delete($path);
+            // Check if the authenticated user owns this post
+            if ($post->user_id !== Auth::id()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized to delete this post'
+                ], 403);
             }
 
+            DB::beginTransaction();
+
+            // Delete associated media files from storage
+            foreach ($post->media as $media) {
+                // Extract path from URL (remove /storage/ prefix)
+                $path = str_replace('/storage/', '', $media->url);
+                if (Storage::disk('public')->exists($path)) {
+                    Storage::disk('public')->delete($path);
+                }
+
+                // Delete thumbnail if exists
+                if ($media->thumbnail_url) {
+                    $thumbnailPath = str_replace('/storage/', '', $media->thumbnail_url);
+                    if (Storage::disk('public')->exists($thumbnailPath)) {
+                        Storage::disk('public')->delete($thumbnailPath);
+                    }
+                }
+            }
+
+            // Delete media records
+            $post->media()->delete();
+
+            // Delete associated records
+            $post->likes()->delete();
+            $post->reposts()->delete();
+            $post->bookmarks()->delete();
+            $post->mentions()->delete();
+
+            // Detach hashtags and decrement their post counts
+            foreach ($post->hashtags as $hashtag) {
+                $hashtag->decrement('posts_count');
+            }
+            $post->hashtags()->detach();
+
+            // Delete replies to this post
+            $post->replies()->delete();
+
+            // Delete the post itself
             $post->delete();
 
             DB::commit();
 
-            return back()->with('success', 'Post deleted successfully!');
+            return response()->json([
+                'success' => true,
+                'message' => 'Post deleted successfully'
+            ]);
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             DB::rollBack();
-            return back()->withErrors(['error' => 'Failed to delete post: ' . $e->getMessage()]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to delete post: ' . $e->getMessage()
+            ], 422);
         }
     }
 
