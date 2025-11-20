@@ -203,6 +203,12 @@ export default function Dashboard() {
     const handleFollow = async (userId: number, e?: React.MouseEvent) => {
         if (e) e.stopPropagation();
 
+        //validasi
+        if (userId === auth.user.id) {
+            toast.error('You cannot follow yourselft');
+            return;
+        }
+
         try {
             const response = await axios.post(`/users/${userId}/follow`);
 
@@ -218,8 +224,17 @@ export default function Dashboard() {
                     return post;
                 }),
             );
-        } catch (error) {
-            console.error('Error toggling follow:', error);
+
+            // Tampilkan pesan sukses yang lebih jelas
+            const actionMessage =
+                response.data.action === 'followed'
+                    ? 'Successfully followed user'
+                    : 'Successfully unfollowed user';
+
+            toast.success(actionMessage);
+        } catch (err) {
+            console.error('Error toggling follow:', err);
+            toast.error('Failed to follow/unfollow user');
         }
     };
 
